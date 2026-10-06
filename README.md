@@ -180,6 +180,28 @@ function find_user(list<User> $users, UserId $id): ?User {
 }
 ```
 
+Aliases can take type parameters, with defaults. Here `Ok` and `Err` are two small classes with `ok`, `data` and `error` properties, like typedhp's own in `runtime/Typedhp/`:
+
+```php
+type Result<T, E = string> = Ok<T>|Err<E>;
+
+function parse(string $text): Result<positive-int> {
+    $number = (int) $text;
+    return $number > 0 ? new Ok($number) : new Err('not a number');
+}
+
+function doubled(string $text): int {
+    $parsed = parse($text);
+    if (!$parsed->ok) {
+        return 0;
+    }
+
+    return $parsed->data * 2;
+}
+```
+
+After the `if`, the checker knows `$parsed` is an `Ok<positive-int>`. Reading `parse($text)->data` without the check is an error, because `data` may be `null`.
+
 ### Type arguments
 
 Pass type arguments with `::<...>`, as in Rust:

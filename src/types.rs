@@ -4,6 +4,7 @@ pub use structure::Declarations;
 pub use structure::Erased;
 pub use structure::Erasure;
 pub use structure::Member;
+pub use structure::Reference;
 pub use structure::Scope;
 pub use structure::TypeParam;
 pub use structure::TypeParamList;
@@ -142,7 +143,7 @@ fn next_type_param(source: &[u8], position: usize) -> Result<(TypeParam, usize),
   };
 
   let name = source[name_start..name_end].to_vec();
-  return Ok((TypeParam { name, bound, variance }, closing));
+  return Ok((TypeParam { name, bound, default: default_type, variance }, closing));
 }
 
 pub fn type_params(source: &[u8], less_than: usize) -> Result<TypeParamList, &'static str> {
@@ -250,19 +251,19 @@ pub fn type_param_at<'a>(
   return innermost.map(|(_, type_param)| type_param);
 }
 
-pub fn reference_spans(source: &[u8], span: ByteSpan) -> Result<Vec<ByteSpan>, &'static str> {
+pub fn type_references(source: &[u8], span: ByteSpan) -> Result<Vec<Reference>, &'static str> {
   let content = source.get(span.start..span.end).ok_or("type outside the source")?;
   let arena = LocalArena::new();
   let parsed =
     parse_type(&arena, content, source_span(span.start, span.end)?).map_err(|_| "invalid type")?;
 
-  return references(&parsed).into_iter().map(byte_span).collect();
+  return references(&parsed);
 }
 
-pub fn argument_reference_spans(
+pub fn argument_references(
   source: &[u8],
   arguments: ByteSpan,
-) -> Result<Vec<ByteSpan>, &'static str> {
+) -> Result<Vec<Reference>, &'static str> {
   let invalid = "invalid generic arguments";
   let anchor = arguments.start.checked_sub(1).ok_or(invalid)?;
   let written = source.get(arguments.start..arguments.end).ok_or(invalid)?;
@@ -271,19 +272,40 @@ pub fn argument_reference_spans(
   let parsed =
     parse_type(&arena, &content, source_span(anchor, arguments.end)?).map_err(|_| invalid)?;
 
-  let spans = references(&parsed).into_iter().map(byte_span).collect::<Result<Vec<_>, _>>()?;
-  return Ok(spans.into_iter().filter(|span| span.start >= arguments.start).collect());
+  let found = references(&parsed)?;
+  return Ok(
+    found.into_iter().filter(|reference| reference.name.start >= arguments.start).collect(),
+  );
 }
 
-fn references(node: &Type<'_>) -> Vec<Span> {
-  let own = match node {
-    Type::Reference(reference) => identifier_span(&reference.kind),
-    Type::MemberReference(member) => identifier_span(&member.kind),
-    _ => None,
+fn reference(node: &Type<'_>) -> Result<Option<Reference>, &'static str> {
+  let (name, arguments) = match node {
+    Type::Reference(reference) => {
+      (identifier_span(&reference.kind), entries(reference.parameters.as_ref()))
+    }
+    Type::MemberReference(member) => (identifier_span(&member.kind), Vec::new()),
+    _ => (None, Vec::new()),
   };
 
-  let nested = children(node).into_iter().flat_map(references);
-  return own.into_iter().chain(nested).collect();
+  let Some(name) = name else {
+    return Ok(None);
+  };
+
+  let name = byte_span(name)?;
+  let has_arguments = !arguments.is_empty();
+  let span = if has_arguments { byte_span(node.span())? } else { name };
+  let arguments =
+    arguments.iter().map(|argument| byte_span(argument.span())).collect::<Result<Vec<_>, _>>()?;
+
+  return Ok(Some(Reference { name, span, arguments }));
+}
+
+fn references(node: &Type<'_>) -> Result<Vec<Reference>, &'static str> {
+  let own = reference(node)?;
+  let nested =
+    children(node).into_iter().map(references).flatten_ok().collect::<Result<Vec<_>, _>>()?;
+
+  return Ok(own.into_iter().chain(nested).collect());
 }
 
 fn identifier_span(kind: &ReferenceKind<'_>) -> Option<Span> {

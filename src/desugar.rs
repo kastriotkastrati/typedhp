@@ -14,13 +14,14 @@ use crate::strip::StripError;
 use crate::strip::apply_edits;
 use crate::strip::guard_size;
 use crate::strip::strip_edits;
+use crate::types::Reference;
 use crate::types::TypeParam;
 use crate::types::TypeParamUse;
 use crate::types::Variance;
-use crate::types::argument_reference_spans;
+use crate::types::argument_references;
 use crate::types::erase;
-use crate::types::reference_spans;
 use crate::types::type_param_at;
+use crate::types::type_references;
 use crate::units::ByteSpan;
 use itertools::Itertools;
 use structure::Annotation;
@@ -29,25 +30,23 @@ use structure::TagContext;
 fn tag_text(
   context: &TagContext<'_>,
   span: ByteSpan,
-  references: &[ByteSpan],
+  references: &[Reference],
 ) -> Result<Vec<u8>, StripError> {
   let classify = |reference: ByteSpan, written: &[u8]| {
-    let is_type_param =
-      type_param_at(&context.sites.declarations, reference.start, written).is_some();
-
+    let type_param = type_param_at(&context.sites.declarations, reference.start, written);
+    let is_type_param = type_param.is_some();
     let alias =
       if is_type_param { None } else { alias_name(context.sites, reference.start, written) };
 
     return match alias {
-      Some(name) => Segment::Alias(name),
+      Some(name) => Segment::Alias { name, arguments: Vec::new() },
       None => Segment::Text(written.to_vec()),
     };
   };
 
-  let pieces = segments(context.source, span, references, classify);
-  let expanded = expand(context.table, &pieces, &[])
-    .map_err(|reason| StripError::at(context.source, span.start, reason))?;
-
+  let pieces = segments(context.source, span, references, &classify);
+  let expanded = expand(context.table, &pieces, &[], &[]);
+  let expanded = expanded.map_err(|reason| StripError::at(context.source, span.start, reason))?;
   let one_line =
     expanded.iter().map(|byte| if matches!(byte, b'\n' | b'\r') { b' ' } else { *byte });
 
@@ -55,7 +54,7 @@ fn tag_text(
 }
 
 fn tag_type(context: &TagContext<'_>, span: ByteSpan) -> Result<Vec<u8>, StripError> {
-  let references = reference_spans(context.source, span)
+  let references = type_references(context.source, span)
     .map_err(|reason| StripError::at(context.source, span.start, reason))?;
 
   return tag_text(context, span, &references);
@@ -163,7 +162,7 @@ fn annotations(context: &TagContext<'_>) -> Result<Vec<Annotation>, StripError> 
   });
 
   let constructions = sites.constructions.iter().map(|construction| {
-    let references = argument_reference_spans(context.source, construction.arguments)
+    let references = argument_references(context.source, construction.arguments)
       .map_err(|reason| StripError::at(context.source, construction.arguments.start, reason))?;
 
     let arguments = tag_text(context, construction.arguments, &references)?;

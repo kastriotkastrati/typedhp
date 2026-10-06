@@ -215,3 +215,86 @@ fn reports_an_imported_type_alias_that_no_file_declares() {
     Err(StripError { line: 4, reason: "this type alias is not declared in the project" })
   );
 }
+
+#[test]
+fn expands_generic_type_aliases_with_their_arguments_and_defaults() -> Result<(), StripError> {
+  let types = r#"<?php
+
+namespace App;
+
+type Result<T, E = string> = Ok<T>|Err<E>;
+type Pair<T> = array{T, T};
+type Id = positive-int;
+"#;
+
+  let source = r#"<?php
+
+namespace App;
+
+use type App\{Result, Pair, Id};
+
+function load(Pair<Id> $ids): Result<list<Id>> {
+    return new Err('none');
+}
+
+function parse(string $text): ?Result<Pair<Id>, \Throwable> {
+    return null;
+}
+"#;
+
+  let desugared = desugar_project(&[types, source])?;
+  assert_eq!(
+    text(&desugared.code),
+    r#"<?php
+
+namespace App;
+
+
+
+/**
+ * @param (array{(positive-int), (positive-int)}) $ids
+ * @return (\App\Ok<(list<(positive-int)>)>|\App\Err<string>)
+ */
+function load(mixed $ids): mixed {
+    return new Err('none');
+}
+
+/** @return ?(\App\Ok<(array{(positive-int), (positive-int)})>|\App\Err<\Throwable>) */ function parse(string $text): mixed {
+    return null;
+}
+"#
+  );
+
+  return Ok(());
+}
+
+#[test]
+fn reports_type_arguments_that_do_not_fit_a_type_alias() {
+  let types = "<?php\ntype Pair<A, B> = array{A, B};\ntype Id = int;\n";
+  let cases = [
+    ("Pair<int, int, int>", "too many type arguments for this type alias"),
+    ("Pair<int>", "missing type arguments for this type alias"),
+    ("Pair", "missing type arguments for this type alias"),
+    ("Id<int>", "too many type arguments for this type alias"),
+  ];
+
+  cases.iter().for_each(|(written, reason)| {
+    let source =
+      format!("<?php\nuse type Pair;\nuse type Id;\nfunction take({written} $value): void {{}}\n");
+
+    let desugared = desugar_project(&[types, &source]);
+    assert_eq!(desugared, Err(StripError { line: 4, reason }), "{written}");
+  });
+}
+
+#[test]
+fn reports_a_type_alias_default_that_uses_a_later_parameter() {
+  let source =
+    "<?php\ntype Pair<A = B, B = int> = array{A, B};\nfunction take(Pair $pair): void {}\n";
+
+  let desugared = desugar_project(&[source]);
+  assert_eq!(
+    desugared,
+    Err(StripError { line: 3, reason: "a type alias parameter has no argument" })
+  );
+}

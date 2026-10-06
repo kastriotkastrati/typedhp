@@ -196,3 +196,80 @@ fn rebuilds_the_mirror_without_deleted_files() -> std::io::Result<()> {
   assert!(!folder.path().join(".typedhp/check/src/old.php").exists());
   return Ok(());
 }
+
+#[test]
+fn narrows_a_generic_result_type_alias() -> std::io::Result<()> {
+  let folder = project()?;
+  write(
+    folder.path(),
+    "src/result.php",
+    r#"<?php
+
+namespace App;
+
+type Result<T, E = string> = Ok<T>|Err<E>;
+
+final readonly class Ok<+T>
+{
+    public true $ok;
+    public null $error;
+
+    public function __construct(public T $data) {
+        $this->ok = true;
+        $this->error = null;
+    }
+}
+
+final readonly class Err<+E>
+{
+    public false $ok;
+    public null $data;
+
+    public function __construct(public E $error) {
+        $this->ok = false;
+        $this->data = null;
+    }
+}
+"#,
+  )?;
+
+  write(
+    folder.path(),
+    "src/use.php",
+    r#"<?php
+
+namespace App;
+
+use type App\Result;
+
+function parse(string $text): Result<positive-int> {
+    $number = (int) $text;
+    return $number > 0 ? new Ok($number) : new Err('not a number');
+}
+
+function doubled(string $text): int {
+    $parsed = parse($text);
+    if (!$parsed->ok) {
+        return 0;
+    }
+
+    return $parsed->data * 2;
+}
+
+function careless(string $text): positive-int {
+    return parse($text)->data;
+}
+"#,
+  )?;
+
+  let output = check(folder.path(), &[])?;
+  assert_eq!(
+    text(&output.stdout),
+    "src/use.php:22: error[nullable-return-statement]: Function `App\\careless` is declared to return `positive-int` but possibly returns a nullable value (inferred as `null|positive-int`).
+src/use.php:22: error[invalid-return-statement]: Invalid return type for function `App\\careless`: expected `positive-int`, but found `null|positive-int`.
+"
+  );
+
+  assert_eq!(output.status.code(), Some(1));
+  return Ok(());
+}

@@ -89,6 +89,7 @@ pub struct Construction {
 pub struct AliasDeclaration {
   pub removal: ByteSpan,
   pub name: Vec<u8>,
+  pub params: Vec<TypeParam>,
   pub body: ByteSpan,
 }
 

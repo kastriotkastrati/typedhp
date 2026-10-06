@@ -17,6 +17,8 @@ use crate::names::find_names;
 use crate::strip::StripError;
 use crate::types::Declarations;
 use crate::types::Scope;
+use crate::types::TypeParamList;
+use crate::types::Variance;
 use crate::types::generic_arguments_span;
 use crate::types::parse_span;
 use crate::types::type_params;
@@ -688,8 +690,9 @@ fn alias_declaration(
   let keyword = code.tokens[index];
   let is_type_keyword = token_text(code, &keyword) == b"type";
   let is_statement = starts_statement(previous_kind(code.tokens, index));
+  let after_name = kind_at(code.tokens, index + 2);
   let names_alias = kind_at(code.tokens, index + 1) == Some(Kind::Name)
-    && kind_at(code.tokens, index + 2) == Some(Kind::Equal);
+    && matches!(after_name, Some(Kind::Equal | Kind::LessThan));
 
   let is_declaration = is_type_keyword && is_statement && names_alias;
   if !is_declaration {
@@ -703,14 +706,36 @@ fn alias_declaration(
     return Err(fail("a type alias name cannot contain a namespace"));
   }
 
-  let body = code.tokens.get(index + 3).ok_or_else(|| fail("cannot read this type alias"))?;
+  let declares_params = after_name == Some(Kind::LessThan);
+  let params = if declares_params {
+    type_params(code.source, code.tokens[index + 2].span.start).map_err(fail)?
+  } else {
+    TypeParamList { span: code.tokens[index + 1].span, params: Vec::new() }
+  };
+
+  let is_constrained = params.params.iter().any(|param| {
+    return param.bound.is_some() || param.variance != Variance::Invariant;
+  });
+
+  if is_constrained {
+    return Err(fail("a type alias parameter cannot have a bound or a variance"));
+  }
+
+  let equal_index = first_token_from(code.tokens, params.span.end);
+  let has_equal = kind_at(code.tokens, equal_index) == Some(Kind::Equal);
+  if !has_equal {
+    return Err(fail("expected `=` after the type alias name"));
+  }
+
+  let body = code.tokens.get(equal_index + 1).ok_or_else(|| fail("cannot read this type alias"))?;
   let body_span = type_span(code, body.span.start, follows_alias_type).map_err(fail)?;
   let body_span = body_span.ok_or_else(|| fail("cannot read this type alias"))?;
   let after_index = first_token_from(code.tokens, body_span.end);
   let ends_with_semicolon = kind_at(code.tokens, after_index) == Some(Kind::Semicolon);
   let end = if ends_with_semicolon { code.tokens[after_index].span.end } else { body_span.end };
   let removal = ByteSpan { start: keyword.span.start, end };
-  return Ok(Some(AliasDeclaration { removal, name: name.to_vec(), body: body_span }));
+  let params = params.params;
+  return Ok(Some(AliasDeclaration { removal, name: name.to_vec(), params, body: body_span }));
 }
 
 pub fn find_sites(source: &[u8], tokens: &[Token]) -> Result<Sites, StripError> {

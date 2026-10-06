@@ -328,3 +328,27 @@ fn reports_the_line_of_a_broken_type_alias() {
   let expected = StripError { line: 3, reason: "cannot read this type alias" };
   assert_eq!(stripped(source), Err(expected));
 }
+
+#[test]
+fn erases_generic_type_aliases() {
+  let source = r#"<?php
+type Result<T, E = string> = Ok<T>|Err<E>;
+function load(): Result<int> { return new Ok(1); }
+function parse(?Result<list<int>, \Throwable> $last): void {}
+"#;
+
+  let expected = r#"<?php
+
+function load(): mixed { return new Ok(1); }
+function parse(mixed $last): void {}
+"#;
+
+  assert_eq!(stripped(source), Ok(expected.to_string()));
+}
+
+#[test]
+fn reports_a_bound_on_a_type_alias_parameter() {
+  let source = "<?php\n\ntype Named<T: \\Stringable> = list<T>;\n";
+  let reason = "a type alias parameter cannot have a bound or a variance";
+  assert_eq!(stripped(source), Err(StripError { line: 3, reason }));
+}

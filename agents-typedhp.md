@@ -187,6 +187,8 @@ function lookup(UserRepository $users, Id $id): ?User {
 - **Import an alias with `use type` in every file except the one that declares it, even in the same namespace.** Group imports work: `use type App\{User, UserId};`. Without an import, typedhp reads `UserId` as a class name. PHP then throws a `TypeError` on every call, and Mago reports ``Cannot find class, interface, enum, or type alias `App\UserId` ``. A full name like `\App\UserId` doesn't work either.
 - **Each alias has one full name in the whole project.** Declaring `App\UserId` twice is an error.
 - **Aliases don't exist at runtime.** PHP runs them as `mixed`, and no file has to be loaded for them.
+- **Aliases can take type parameters, with defaults:** `type Result<T, E = string> = Ok<T>|Err<E>;`. Pass arguments as you would to a generic class: `Result<User>`, `Result<User, \Throwable>`. Too many arguments, or a missing one without a default, is an error. Alias parameters can't have a bound or a variance.
+- **Narrow a union on a property with a fixed value.** When `Ok` has `public true $ok` and `Err` has `public false $ok`, Mago reads `if (!$result->ok) { return $result; }` and then knows `$result->data` is the `Ok` value.
 
 ## What errors look like
 

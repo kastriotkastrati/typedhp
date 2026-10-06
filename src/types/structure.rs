@@ -29,7 +29,15 @@ pub enum Variance {
 pub struct TypeParam {
   pub name: Vec<u8>,
   pub bound: Option<ByteSpan>,
+  pub default: Option<ByteSpan>,
   pub variance: Variance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Reference {
+  pub name: ByteSpan,
+  pub span: ByteSpan,
+  pub arguments: Vec<ByteSpan>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
