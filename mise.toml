@@ -13,3 +13,7 @@ macos-arm64 = { url = "https://dl.static-php.dev/static-php-cli/common/php-{{ver
 [tasks.test]
 description = "run every test; the runtime tests need the php above on PATH"
 run = "cargo test"
+
+[tasks.php-check]
+description = "type-check runtime/ with typedhp, then lint the plain copy typedhp wrote; mago cannot parse runtime/ itself"
+run = ["cargo run --quiet -- check", "cd .typedhp/check && mago lint"]

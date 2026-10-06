@@ -99,6 +99,16 @@ fn strip_command(path: &Path, input: StripInput) -> Result<(), Failure> {
 }
 
 fn install_command(folder: &Path) -> Result<(), Failure> {
+  let stripped_loader_files = loader_files()
+    .into_iter()
+    .map(|(relative, contents)| {
+      let stripped = typedhp::strip(contents.as_bytes());
+      return stripped
+        .map(|code| (relative, code))
+        .map_err(|error| Failure::Strip { path: PathBuf::from(relative), error });
+    })
+    .collect::<Result<Vec<_>, Failure>>()?;
+
   let executable = std::env::current_exe().map_err(install_failure(Path::new("typedhp")))?;
   let binary = std::fs::read(&executable).map_err(install_failure(&executable))?;
   std::fs::create_dir_all(folder).map_err(install_failure(folder))?;
@@ -129,8 +139,8 @@ fn install_command(folder: &Path) -> Result<(), Failure> {
   let ini_text = format!("auto_prepend_file = \"{home_text}/loader.php\"\n");
   write_file(&bin.join("typedhp"), &binary, 0o755)?;
   write_file(&bin.join("php"), shim().as_bytes(), 0o755)?;
-  loader_files().into_iter().try_for_each(|(relative, contents)| {
-    return write_file(&home.join(relative), contents.as_bytes(), 0o644);
+  stripped_loader_files.iter().try_for_each(|(relative, code)| {
+    return write_file(&home.join(relative), code, 0o644);
   })?;
 
   write_file(&ini.join("typedhp.ini"), ini_text.as_bytes(), 0o644)?;

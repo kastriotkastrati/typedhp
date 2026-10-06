@@ -8,8 +8,7 @@ final readonly class ProcessRun
 {
     public function __construct(public int $exitCode, public string $output, public string $errors) {}
 
-    /** @param non-empty-list<string> $command */
-    public static function start(array $command, string $input): self {
+    public static function start(non-empty-list<string> $command, string $input): self {
         $pipes = [];
         $process = proc_open($command, [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes);
         $stdin = $pipes[0] ?? null;

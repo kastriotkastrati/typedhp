@@ -16,17 +16,13 @@ final class StrippingFileWrapper
 
     private static string $primaryScript = '';
 
-    /** @var resource|null */
-    public $context;
+    public ?resource $context = null;
 
-    /** @var resource */
-    private $handle;
+    private resource $handle;
 
-    /** @var resource */
-    private $directory;
+    private resource $directory;
 
-    /** @var array<int|string, int>|null */
-    private ?array $strippedStat = null;
+    private ?array<int|string, int> $strippedStat = null;
 
     public static function enable(): bool {
         stream_wrapper_unregister('file');
@@ -116,8 +112,7 @@ final class StrippingFileWrapper
         };
     }
 
-    /** @return array<int|string, int>|false */
-    public function stream_stat(): array|false {
+    public function stream_stat(): array<int|string, int>|false {
         $isStrippedInclude = $this->strippedStat !== null;
         if ($isStrippedInclude) {
             return $this->strippedStat;
@@ -126,8 +121,7 @@ final class StrippingFileWrapper
         return fstat($this->handle);
     }
 
-    /** @return resource */
-    public function stream_cast(int $cast_as) {
+    public function stream_cast(int $cast_as): resource {
         return $this->handle;
     }
 
@@ -145,8 +139,7 @@ final class StrippingFileWrapper
         });
     }
 
-    /** @return array<int|string, int>|false */
-    public function url_stat(string $path, int $flags): array|false {
+    public function url_stat(string $path, int $flags): array<int|string, int>|false {
         $readsLink = ($flags & STREAM_URL_STAT_LINK) !== 0;
         $isQuiet = ($flags & STREAM_URL_STAT_QUIET) !== 0;
         return self::outsideWrapper(static function () use ($path, $readsLink, $isQuiet): array|false {
@@ -247,14 +240,7 @@ final class StrippingFileWrapper
         return $isTyped ? $path : null;
     }
 
-    /**
-     * @template T
-     *
-     * @param Closure(): T $operation
-     *
-     * @return T
-     */
-    private static function outsideWrapper(Closure $operation): mixed {
+    private static function outsideWrapper<T>(Closure(): T $operation): T {
         stream_wrapper_restore('file');
         try {
             return $operation();
