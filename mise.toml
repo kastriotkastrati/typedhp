@@ -1,0 +1,15 @@
+[tools."http:php"]
+version = "8.5.8"
+
+[tools."http:php".platforms]
+linux-x64 = { url = "https://dl.static-php.dev/static-php-cli/common/php-{{version}}-cli-linux-x86_64.tar.gz" }
+linux-arm64 = { url = "https://dl.static-php.dev/static-php-cli/common/php-{{version}}-cli-linux-aarch64.tar.gz" }
+macos-x64 = { url = "https://dl.static-php.dev/static-php-cli/common/php-{{version}}-cli-macos-x86_64.tar.gz" }
+macos-arm64 = { url = "https://dl.static-php.dev/static-php-cli/common/php-{{version}}-cli-macos-aarch64.tar.gz" }
+
+[tools]
+"github:carthage-software/mago" = "1.51.2"
+
+[tasks.test]
+description = "run every test; the runtime tests need the php above on PATH"
+run = "cargo test"

@@ -1,0 +1,39 @@
+#!/bin/sh
+# typedhp shim. Installed as `php` by `typedhp install`; runs the next php on PATH.
+#   php --strip-types ...  runs php with ../ini/typedhp.ini, which makes php run ../loader.php first.
+#                          PHP_INI_SCAN_DIR is inherited, so php processes started by this one strip too.
+#   php --typecheck ...    runs `typedhp check ...`.
+#   php ...                runs php unchanged.
+set -eu
+shim=$(realpath "$0")
+typedhp_home=$(dirname "$(dirname "$shim")")
+real_php=$(
+  set -f
+  IFS=:
+  for directory in $PATH; do
+    candidate="$directory/php"
+    [ -x "$candidate" ] || continue
+    [ "$(realpath "$candidate")" = "$shim" ] && continue
+    echo "$candidate"
+    exit 0
+  done
+
+  exit 1
+) || {
+  echo "typedhp: no php on PATH besides this shim ($shim)" >&2
+  exit 127
+}
+
+case "${1-}" in
+  --strip-types)
+    shift
+    PHP_INI_SCAN_DIR="${PHP_INI_SCAN_DIR-}:$typedhp_home/ini" exec "$real_php" "$@"
+    ;;
+  --typecheck)
+    shift
+    exec "$typedhp_home/bin/typedhp" check "$@"
+    ;;
+  *)
+    exec "$real_php" "$@"
+    ;;
+esac

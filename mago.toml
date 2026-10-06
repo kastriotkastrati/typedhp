@@ -1,0 +1,28 @@
+php-version = "8.5.0"
+
+[source]
+paths = ["runtime"]
+
+[formatter]
+preset = "psr-12"
+print-width = 120
+function-brace-style = "same_line"
+method-brace-style = "same_line"
+inline-empty-constructor-braces = true
+break-promoted-properties-list = false
+preserve-breaking-parameter-list = false
+preserve-breaking-array-like = false
+method-chain-breaking-style = "same_line"
+first-method-chain-on-new-line = false
+inline-empty-method-braces = true
+inline-empty-function-braces = true
+inline-empty-classlike-braces = true
+space-within-grouping-parenthesis = false
+combine-opening-tag-and-declare = true
+sort-uses = true
+expand-use-groups = false
+space-before-arrow-function-parameter-list-parenthesis = false
+trailing-comma = true
+omit-redundant-arithmetic-binary-expression-parentheses = true
+omit-redundant-bitwise-binary-expression-parentheses = true
+
