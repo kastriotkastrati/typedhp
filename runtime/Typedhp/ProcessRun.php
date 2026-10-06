@@ -2,20 +2,21 @@
 
 namespace Typedhp;
 
-use RuntimeException;
+use type Typedhp\Result;
 
 final readonly class ProcessRun
 {
     public function __construct(public int $exitCode, public string $output, public string $errors) {}
 
-    public static function start(non-empty-list<string> $command, string $input): self {
+    public static function start(non-empty-list<string> $command, string $input): Result<self, non-empty-string> {
         $pipes = [];
         $process = proc_open($command, [['pipe', 'r'], ['pipe', 'w'], ['pipe', 'w']], $pipes);
         $stdin = $pipes[0] ?? null;
         $stdout = $pipes[1] ?? null;
         $stderr = $pipes[2] ?? null;
-        if ($process === false || $stdin === null || $stdout === null || $stderr === null) {
-            throw new RuntimeException("typedhp: cannot run {$command[0]}");
+        $isStarted = $process !== false && $stdin !== null && $stdout !== null && $stderr !== null;
+        if (!$isStarted) {
+            return new Err("typedhp: cannot run {$command[0]}");
         }
 
         fwrite($stdin, $input);
@@ -25,10 +26,12 @@ final readonly class ProcessRun
         fclose($stdout);
         fclose($stderr);
         $exitCode = proc_close($process);
-        if ($output === false || $errors === false) {
-            throw new RuntimeException("typedhp: cannot read the output of {$command[0]}");
+        $isRead = $output !== false && $errors !== false;
+        if (!$isRead) {
+            return new Err("typedhp: cannot read the output of {$command[0]}");
         }
 
-        return new self($exitCode, $output, $errors);
+        $run = new self($exitCode, $output, $errors);
+        return new Ok($run);
     }
 }

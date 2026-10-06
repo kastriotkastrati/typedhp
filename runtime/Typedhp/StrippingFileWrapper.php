@@ -3,7 +3,7 @@
 namespace Typedhp;
 
 use Closure;
-use RuntimeException;
+use type Typedhp\Result;
 
 /**
  * Implements PHP's stream wrapper protocol, which fixes its method names and count:
@@ -27,7 +27,8 @@ final class StrippingFileWrapper
     public static function enable(): bool {
         stream_wrapper_unregister('file');
         stream_wrapper_register('file', self::class);
-        $typedPrimaryScript = self::outsideWrapper(self::typedPrimaryScript(...));
+        $found = self::outsideWrapper(PrimaryScript::typedPath(...));
+        $typedPrimaryScript = Result::okOrThrow($found);
         $runsPrimaryScript = $typedPrimaryScript !== null;
         if ($runsPrimaryScript) {
             self::$primaryScript = $typedPrimaryScript;
@@ -44,7 +45,8 @@ final class StrippingFileWrapper
         $isInclude = ($options & self::STREAM_OPEN_FOR_INCLUDE) !== 0;
         $stripsFile = $isInclude && !Stripper::isVendorPath($path);
         if ($stripsFile) {
-            return self::outsideWrapper(fn(): bool => $this->openStripped($path));
+            $opened = self::outsideWrapper(fn(): Result<bool, non-empty-string> => $this->openStripped($path));
+            return Result::okOrThrow($opened);
         }
 
         $usesIncludePath = ($options & STREAM_USE_PATH) !== 0;
@@ -78,7 +80,8 @@ final class StrippingFileWrapper
     public function stream_tell(): int {
         $position = ftell($this->handle);
         $isKnown = $position !== false;
-        return $isKnown ? $position : throw new RuntimeException('typedhp: cannot read the stream position');
+        $told = $isKnown ? new Ok($position) : new Err('typedhp: cannot read the stream position');
+        return Result::okOrThrow($told);
     }
 
     public function stream_seek(int $offset, int $whence): bool {
@@ -194,50 +197,32 @@ final class StrippingFileWrapper
         return true;
     }
 
-    private function openStripped(string $path): bool {
+    private function openStripped(string $path): Result<bool, non-empty-string> {
         $isFile = is_file($path);
         if (!$isFile) {
-            return false;
+            return new Ok(false);
         }
 
         $original = file_get_contents($path);
         $stat = stat($path);
         $isRead = $original !== false && $stat !== false;
         if (!$isRead) {
-            return false;
+            return new Ok(false);
         }
 
-        $source = Stripper::source($path, $original);
+        $stripped = Stripper::source($path, $original);
+        if (!$stripped->ok) {
+            return $stripped;
+        }
+
+        $source = $stripped->data;
         $memory = fopen('php://memory', mode: 'w+b');
         fwrite($memory, $source);
         rewind($memory);
         $size = strlen($source);
         $this->handle = $memory;
         $this->strippedStat = array_replace($stat, ['size' => $size, 7 => $size]);
-        return true;
-    }
-
-    private static function typedPrimaryScript(): ?string {
-        $isCommandLine = PHP_SAPI === 'cli';
-        if (!$isCommandLine) {
-            return null;
-        }
-
-        $scriptFilename = $_SERVER['SCRIPT_FILENAME'];
-        $isScriptFile = is_file($scriptFilename);
-        if (!$isScriptFile) {
-            return null;
-        }
-
-        $path = realpath($scriptFilename);
-        $original = file_get_contents($scriptFilename);
-        $isStrippable = $path !== false && $original !== false && !Stripper::isVendorPath($path);
-        if (!$isStrippable) {
-            return null;
-        }
-
-        $isTyped = Stripper::source($path, $original) !== $original;
-        return $isTyped ? $path : null;
+        return new Ok(true);
     }
 
     private static function outsideWrapper<T>(Closure(): T $operation): T {

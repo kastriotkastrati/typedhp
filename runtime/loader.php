@@ -9,8 +9,12 @@
 
 namespace Typedhp;
 
+require __DIR__ . '/Typedhp/Ok.php';
+require __DIR__ . '/Typedhp/Err.php';
+require __DIR__ . '/Typedhp/Result.php';
 require __DIR__ . '/Typedhp/ProcessRun.php';
 require __DIR__ . '/Typedhp/Stripper.php';
+require __DIR__ . '/Typedhp/PrimaryScript.php';
 require __DIR__ . '/Typedhp/StrippingFileWrapper.php';
 if (StrippingFileWrapper::enable()) {
     require StrippingFileWrapper::primaryScript();

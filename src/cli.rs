@@ -34,11 +34,15 @@ fn shim() -> &'static str {
   return include_str!("../runtime/php");
 }
 
-fn loader_files() -> [(&'static str, &'static str); 4] {
+fn loader_files() -> [(&'static str, &'static str); 8] {
   return [
     ("loader.php", include_str!("../runtime/loader.php")),
+    ("Typedhp/Ok.php", include_str!("../runtime/Typedhp/Ok.php")),
+    ("Typedhp/Err.php", include_str!("../runtime/Typedhp/Err.php")),
+    ("Typedhp/Result.php", include_str!("../runtime/Typedhp/Result.php")),
     ("Typedhp/ProcessRun.php", include_str!("../runtime/Typedhp/ProcessRun.php")),
     ("Typedhp/Stripper.php", include_str!("../runtime/Typedhp/Stripper.php")),
+    ("Typedhp/PrimaryScript.php", include_str!("../runtime/Typedhp/PrimaryScript.php")),
     (
       "Typedhp/StrippingFileWrapper.php",
       include_str!("../runtime/Typedhp/StrippingFileWrapper.php"),

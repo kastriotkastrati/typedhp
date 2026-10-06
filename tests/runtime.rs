@@ -286,3 +286,22 @@ fn type_checks_the_project_through_the_shim() -> std::io::Result<()> {
   assert_eq!(output.status.code(), Some(1));
   return Ok(());
 }
+
+#[test]
+fn reports_a_missing_stripper_as_one_exception() -> std::io::Result<()> {
+  let installation = install()?;
+  let binary = installation.home.join("bin").join("typedhp");
+  std::fs::remove_file(&binary)?;
+  write(&installation.project, "main.php", "<?php\necho 'ran';\n")?;
+  let output = php(&installation, &["--strip-types", "main.php"])?;
+  let printed = [text(&output.stdout), text(&output.stderr)].concat();
+  let expected = format!(
+    "Uncaught RuntimeException: typedhp: {} is missing; run `typedhp install` again",
+    binary.display()
+  );
+
+  assert!(printed.contains(&expected), "{printed}");
+  assert!(!printed.contains("ran"), "{printed}");
+  assert_eq!(output.status.code(), Some(255));
+  return Ok(());
+}
