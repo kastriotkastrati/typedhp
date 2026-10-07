@@ -9,8 +9,11 @@ This project writes PHP with typedhp: TypeScript-style types, written inline in 
 | run a script | `php --strip-types script.php` |
 | run artisan | `php --strip-types artisan <command>` |
 | run the tests | `php --strip-types artisan test` or `php --strip-types vendor/bin/phpunit` |
-| check every file | `php --typecheck`, from the project root |
+| check every file | `php --typecheck` or `mago analyze`, from the project root |
 | check some files | `php --typecheck src/Users.php` (extra arguments go to `mago analyze`) |
+| format files | `mago format`, or `mago format src/Users.php` |
+| lint files | `mago lint`, or `mago lint src/Users.php` |
+| fix lint issues | `mago lint --fix`, then `mago format` |
 | see what PHP runs | `typedhp strip src/Users.php` |
 | see what Mago checked | open `.typedhp/check/src/Users.php` |
 
@@ -19,7 +22,8 @@ This project writes PHP with typedhp: TypeScript-style types, written inline in 
 Don't:
 
 - **Run typed files with plain `php`.** It stops at the first type it doesn't know with a parse error. Always pass `--strip-types`.
-- **Run `php -l`, `mago fmt` or `mago lint` on typed files.** They can't parse typed syntax. Expect the same from any tool that parses PHP itself, such as a formatter or linter.
+- **Run `php -l`, `vendor/bin/mago` or other PHP tools on typed files.** They can't parse typed syntax. Run Mago as `mago`, which finds typedhp's shim, so that format, lint and analyze work.
+- **Pass `--dry-run` or `--format-after-fix`.** They refuse to run in a project with typed files. Run `mago lint --fix`, then `mago format`. Fix by hand any issue that `mago lint --fix` skips with `error[typedhp]`.
 - **Put typed code under `vendor/`.** typedhp never strips files there.
 
 ## Where types go
@@ -33,10 +37,10 @@ final class Settings
 
     public ?array{debug: bool} $flags = null;
 
-    public function __construct(private positive-int $ttl) {}
+    public function __construct(private PositiveInt $ttl) {}
 
-    public function label(non-empty-string $prefix): non-empty-string {
-        $format = fn(positive-int $value): string => "{$prefix}: {$value}";
+    public function label(NonEmptyString $prefix): NonEmptyString {
+        $format = fn(PositiveInt $value): string => "{$prefix}: {$value}";
         return $format($this->ttl);
     }
 }
@@ -48,32 +52,34 @@ Don't write `@param`, `@return`, `@var`, `@template`, `@extends`, `@implements` 
 
 Plain PHP types work as before. On top of them, use these. The right column is what PHP checks at runtime; Mago checks the whole type.
 
+Write the PHPDoc names that have hyphens in TitleCase: `PositiveInt`, not `positive-int`. typedhp refuses the hyphenated names. Mago's messages show the TitleCase names too.
+
 | Type | Means | PHP runs it as |
 |---|---|---|
-| `list<T>`, `non-empty-list<T>` | array with keys 0, 1, 2, … | `array` |
-| `array<K, V>`, `non-empty-array<K, V>` | array with these keys and values | `array` |
+| `list<T>`, `NonEmptyList<T>` | array with keys 0, 1, 2, … | `array` |
+| `array<K, V>`, `NonEmptyArray<K, V>` | array with these keys and values | `array` |
 | `array{id: int, name?: string}` | array with these keys; `?` marks a key that may be missing | `array` |
 | `object{id: int}` | object with these properties | `object` |
 | `iterable<K, V>` | | `iterable` |
 | `\Generator<K, V, TSend, TReturn>`, `\Traversable<K, V>`, any generic class | | the class |
-| `positive-int`, `negative-int`, `non-negative-int` | | `int` |
+| `PositiveInt`, `NegativeInt`, `NonNegativeInt` | | `int` |
 | `int<1, 10>`, `int<0, max>` | int in this range | `int` |
-| `non-empty-string`, `numeric-string`, `lowercase-string`, `literal-string`, `callable-string` | | `string` |
-| `class-string`, `class-string<\Throwable>` | name of a class (that extends `\Throwable`) | `string` |
+| `NonEmptyString`, `NumericString`, `LowercaseString`, `LiteralString`, `CallableString` | | `string` |
+| `ClassString`, `ClassString<\Throwable>` | name of a class (that extends `\Throwable`) | `string` |
 | `'asc'\|'desc'` | one of these strings | `string` |
 | `1\|2\|3` | one of these ints | `int` |
-| `array-key` | | `int\|string` |
+| `ArrayKey` | | `int\|string` |
 | `numeric` | | `int\|float\|string` |
 | `scalar` | | `int\|float\|string\|bool` |
 | `callable(int): string` | | `callable` |
 | `\Closure(int): string` | | `\Closure` |
-| `key-of<T>`, `value-of<T>` | | `mixed` |
+| `KeyOf<T>`, `ValueOf<T>` | | `mixed` |
 | a type parameter `T` | | its bound, or `mixed` |
 | a type alias | | `mixed` |
 
 `?` and `|null` keep working: `?list<int>` runs as `?array`.
 
-PHP checks only the right column. A `positive-int` parameter still accepts `0` when PHP runs it, and an alias accepts anything. Validate data from outside the program, such as request input, JSON and database rows, with real runtime checks.
+PHP checks only the right column. A `PositiveInt` parameter still accepts `0` when PHP runs it, and an alias accepts anything. Validate data from outside the program, such as request input, JSON and database rows, with real runtime checks.
 
 ## Generics
 
@@ -165,8 +171,8 @@ Rules:
 
 namespace App;
 
-type UserId = positive-int;
-type Email = non-empty-string;
+type UserId = PositiveInt;
+type Email = NonEmptyString;
 type User = array{id: UserId, email: Email, admin?: bool};
 ```
 
@@ -203,8 +209,8 @@ function mistakes(UserRepository $users, Mailer $mailer): void {
 ```
 $ php --typecheck
 typedhp: running mago analyze in .typedhp/check
-src/mistakes.php:6: error[invalid-argument]: Invalid argument type for argument #1 of `App\UserRepository::find`: expected `positive-int`, but found `int(0)`.
-src/mistakes.php:7: error[possibly-invalid-argument]: Possible argument type mismatch for argument #1 of `App\Mailer::handle`: expected `array{'admin'?: bool, 'email': non-empty-string, 'id': positive-int}`, but possibly received `array{'id': int(1)}`.
+src/mistakes.php:6: error[invalid-argument]: Invalid argument type for argument #1 of `App\UserRepository::find`: expected `PositiveInt`, but found `int(0)`.
+src/mistakes.php:7: error[possibly-invalid-argument]: Possible argument type mismatch for argument #1 of `App\Mailer::handle`: expected `array{'admin'?: bool, 'email': NonEmptyString, 'id': PositiveInt}`, but possibly received `array{'id': int(1)}`.
 src/mistakes.php:8: error[template-constraint-violation]: Argument type mismatch for template `T`.
 src/mistakes.php:8: error[template-constraint-violation]: Argument type mismatch for template `T`.
 src/mistakes.php:8: error[invalid-argument]: Invalid argument type for argument #1 of `App\longest`: expected `('T.app\longest() extends Countable)`, but found `int(1)`.
@@ -223,5 +229,6 @@ Line numbers point at your file. typedhp never moves a line, so errors from PHP 
 ## Before you finish
 
 1. `php --typecheck` prints `typedhp: no issues found`.
-2. The tests pass through `php --strip-types`.
-3. You wrote types inline, not in docblocks, and imported each alias you used with `use type`.
+2. You ran `mago format`, and `mago lint` prints `typedhp: no issues found`.
+3. The tests pass through `php --strip-types`.
+4. You wrote types inline, not in docblocks, and imported each alias you used with `use type`.

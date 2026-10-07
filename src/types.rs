@@ -39,6 +39,119 @@ fn byte_span(span: Span) -> Result<ByteSpan, &'static str> {
   return Ok(ByteSpan { start, end });
 }
 
+fn builtin_spellings() -> [&'static str; 47] {
+  return [
+    "array-key",
+    "associative-array",
+    "callable-string",
+    "class-like-string",
+    "class-string",
+    "closed-resource",
+    "empty-scalar",
+    "enum-string",
+    "interface-string",
+    "int-mask",
+    "int-mask-of",
+    "key-of",
+    "literal-float",
+    "literal-int",
+    "literal-string",
+    "lowercase-callable-string",
+    "lowercase-string",
+    "negative-int",
+    "never-return",
+    "never-returns",
+    "non-empty",
+    "non-empty-array",
+    "non-empty-list",
+    "non-empty-literal-string",
+    "non-empty-lowercase-string",
+    "non-empty-mixed",
+    "non-empty-string",
+    "non-empty-uppercase-string",
+    "non-falsy-string",
+    "non-negative-int",
+    "non-positive-int",
+    "non-zero-int",
+    "no-return",
+    "numeric-string",
+    "open-resource",
+    "positive-int",
+    "private-properties-of",
+    "properties-of",
+    "protected-properties-of",
+    "public-properties-of",
+    "stringable-object",
+    "template-type",
+    "trait-string",
+    "truthy-string",
+    "uppercase-callable-string",
+    "uppercase-string",
+    "value-of",
+  ];
+}
+
+pub fn builtin_spelling(declarations: &Declarations, written: &[u8]) -> Option<&'static str> {
+  let is_class = declarations.classes.iter().any(|class| class.eq_ignore_ascii_case(written));
+  if is_class {
+    return None;
+  }
+
+  let lowered = written.to_ascii_lowercase();
+  return builtin_spellings().into_iter().find(|spelling| {
+    let joined = spelling.bytes().filter(|byte| *byte != b'-');
+    return joined.eq(lowered.iter().copied());
+  });
+}
+
+pub fn title_case_types(message: &str) -> String {
+  let segments = message.split('`').enumerate().map(|(index, segment)| {
+    let is_quoted = index % 2 == 1;
+    if !is_quoted {
+      return segment.to_string();
+    }
+
+    let runs =
+      segment.chars().chunk_by(|character| character.is_ascii_alphabetic() || *character == '-');
+
+    let rewritten = (&runs).into_iter().map(|(is_word, run)| {
+      let run = run.collect::<String>();
+      let is_builtin = is_word && builtin_spellings().contains(&run.as_str());
+      if !is_builtin {
+        return run;
+      }
+
+      let parts = run.split('-').filter_map(|part| part.split_at_checked(1));
+      return parts
+        .map(|(first, rest)| [first.to_ascii_uppercase().as_str(), rest].concat())
+        .collect();
+    });
+
+    return rewritten.collect::<String>();
+  });
+
+  return segments.collect::<Vec<_>>().join("`");
+}
+
+fn reject_hyphenated(source: &[u8], node: &Type<'_>) -> Result<(), &'static str> {
+  let start = to_offset(node.span().start.offset)?;
+  let rest = source.get(start..).ok_or("type outside the source")?;
+  let word_length = rest
+    .iter()
+    .take_while(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+    .count();
+
+  let is_hyphenated = rest[..word_length].windows(3).any(|window| {
+    return window[0].is_ascii_alphabetic() && window[1] == b'-' && window[2].is_ascii_alphabetic();
+  });
+
+  if is_hyphenated {
+    return Err("write this type in TitleCase, such as `NonEmptyString` for `non-empty-string`");
+  }
+
+  return children(node).into_iter().try_for_each(|child| reject_hyphenated(source, child));
+}
+
 fn skip_whitespace(source: &[u8], start: usize) -> usize {
   let rest = &source[start.min(source.len())..];
   let whitespace = rest.iter().take_while(|byte| byte.is_ascii_whitespace()).count();
@@ -60,6 +173,7 @@ pub fn parse_span(
     return Ok(None);
   };
 
+  reject_hyphenated(source, &parsed_type)?;
   return byte_span(parsed_type.span()).map(Some);
 }
 
@@ -74,6 +188,7 @@ pub fn generic_arguments_span(
   let content = [b"X".as_slice(), arguments].concat();
   let arena = LocalArena::new();
   let parsed = parse_type(&arena, &content, source_span(anchor, limit)?).map_err(|_| invalid)?;
+  reject_hyphenated(source, &parsed)?;
   let Type::Reference(reference) = &parsed else {
     return Err(invalid);
   };
@@ -455,7 +570,26 @@ fn erase_type(node: &Type<'_>, context: &EraseContext<'_>) -> Result<Erasure, &'
       let type_param = type_param_at(context.declarations, context.position, name);
       let is_alias = context.declarations.aliases.iter().any(|alias| alias.as_slice() == name);
       let Some(type_param) = type_param else {
-        return Ok(if is_alias { mixed(true) } else { named(name, has_parameters) });
+        if is_alias {
+          return Ok(mixed(true));
+        }
+
+        let Some(spelling) = builtin_spelling(context.declarations, name) else {
+          return Ok(named(name, has_parameters));
+        };
+
+        let parameters =
+          reference.parameters.as_ref().map(|parameters| byte_span(parameters.span()));
+
+        let parameters = parameters.transpose()?;
+        let written_parameters =
+          parameters.map_or(b"".as_slice(), |span| &context.source[span.start..span.end]);
+
+        let keyword_type = [spelling.as_bytes(), written_parameters].concat();
+        let arena = LocalArena::new();
+        let keyword_span = source_span(0, keyword_type.len())?;
+        let parsed = parse_type(&arena, &keyword_type, keyword_span).map_err(|_| "invalid type")?;
+        return erase_type(&parsed, context);
       };
 
       let is_inside_bound = context.type_param_use == TypeParamUse::Mixed;

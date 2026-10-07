@@ -45,7 +45,7 @@ final class StrippingFileWrapper
         $isInclude = ($options & self::STREAM_OPEN_FOR_INCLUDE) !== 0;
         $stripsFile = $isInclude && !Stripper::isVendorPath($path);
         if ($stripsFile) {
-            $opened = self::outsideWrapper(fn(): Result<bool, non-empty-string> => $this->openStripped($path));
+            $opened = self::outsideWrapper(fn(): Result<bool, NonEmptyString> => $this->openStripped($path));
             return Result::okOrThrow($opened);
         }
 
@@ -197,7 +197,7 @@ final class StrippingFileWrapper
         return true;
     }
 
-    private function openStripped(string $path): Result<bool, non-empty-string> {
+    private function openStripped(string $path): Result<bool, NonEmptyString> {
         $isFile = is_file($path);
         if (!$isFile) {
             return new Ok(false);

@@ -13,6 +13,7 @@ pub enum Command {
   Strip { path: PathBuf, input: StripInput },
   Install { folder: PathBuf },
   Check { mago_arguments: Vec<OsString> },
+  Mago { arguments: Vec<OsString> },
 }
 
 #[derive(Debug)]
@@ -25,6 +26,8 @@ pub enum Failure {
   Install { path: PathBuf, error: std::io::Error },
   Check { path: PathBuf, error: std::io::Error },
   Walk { error: ignore::Error },
+  MissingMago,
+  Unsupported { command: &'static str, flag: OsString },
   StartMago { program: PathBuf, error: std::io::Error },
   MagoStopped { program: PathBuf },
   MagoReport { error: serde_json::Error },

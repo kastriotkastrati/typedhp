@@ -921,6 +921,7 @@ dependencies = [
  "mago-span",
  "mago-syntax",
  "mago-syntax-core",
+ "mago-text-edit",
  "serde",
  "serde_json",
  "tempfile",

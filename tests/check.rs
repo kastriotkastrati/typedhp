@@ -133,7 +133,7 @@ fn passes_a_clean_project_and_keeps_the_mirror_out_of_git() -> std::io::Result<(
   write(
     folder.path(),
     "src/use.php",
-    "<?php\n\nnamespace App;\n\nfunction label(non-empty-string $name): string {\n    return $name;\n}\n",
+    "<?php\n\nnamespace App;\n\nfunction label(NonEmptyString $name): string {\n    return $name;\n}\n",
   )?;
 
   let output = check(folder.path(), &[])?;
@@ -242,7 +242,7 @@ namespace App;
 
 use type App\Result;
 
-function parse(string $text): Result<positive-int> {
+function parse(string $text): Result<PositiveInt> {
     $number = (int) $text;
     return $number > 0 ? new Ok($number) : new Err('not a number');
 }
@@ -256,7 +256,7 @@ function doubled(string $text): int {
     return $parsed->data * 2;
 }
 
-function careless(string $text): positive-int {
+function careless(string $text): PositiveInt {
     return parse($text)->data;
 }
 "#,
@@ -265,8 +265,8 @@ function careless(string $text): positive-int {
   let output = check(folder.path(), &[])?;
   assert_eq!(
     text(&output.stdout),
-    "src/use.php:22: error[nullable-return-statement]: Function `App\\careless` is declared to return `positive-int` but possibly returns a nullable value (inferred as `null|positive-int`).
-src/use.php:22: error[invalid-return-statement]: Invalid return type for function `App\\careless`: expected `positive-int`, but found `null|positive-int`.
+    "src/use.php:22: error[nullable-return-statement]: Function `App\\careless` is declared to return `PositiveInt` but possibly returns a nullable value (inferred as `null|PositiveInt`).
+src/use.php:22: error[invalid-return-statement]: Invalid return type for function `App\\careless`: expected `PositiveInt`, but found `null|PositiveInt`.
 "
   );
 

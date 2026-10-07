@@ -84,7 +84,7 @@ final class Box<+T> extends Base<T> implements Holder<T>, Countable
     public const list<int> SIZES = [1];
     private ?T $value = null;
 
-    public function __construct(private non-empty-string $name) {}
+    public function __construct(private NonEmptyString $name) {}
 }
 
 function make(): void {
@@ -128,12 +128,12 @@ function make(): void {
 }
 
 #[test]
-fn adds_tags_to_a_one_line_docblock() -> Result<(), StripError> {
+fn adds_tags_to_a_one_line_docblock_without_trailing_blanks() -> Result<(), StripError> {
   let source = "<?php\n    /** @var Command $this */\n    $numbers = new Stack::<int>();\n";
   let desugared = desugar_project(&[source])?;
   assert_eq!(
     text(&desugared.code),
-    "<?php\n    /** @var Command $this \n     * @var Stack<int> $numbers\n     */\n    $numbers = new Stack();\n"
+    "<?php\n    /** @var Command $this\n     * @var Stack<int> $numbers\n     */\n    $numbers = new Stack();\n"
   );
 
   assert_eq!(desugared.lines, vec![1, 2, 2, 2, 3, 4]);
@@ -148,7 +148,7 @@ namespace App\Types;
 
 use App\Models\User;
 
-type Id = positive-int;
+type Id = PositiveInt;
 type Users = list<User>;
 type Index = array<Id, Users>;
 "#;
@@ -179,6 +179,44 @@ namespace App;
  * @return ?(positive-int)
  */
 function find(mixed $index, mixed $key): mixed {
+    return null;
+}
+"#
+  );
+
+  return Ok(());
+}
+
+#[test]
+fn writes_title_case_types_the_way_mago_spells_them() -> Result<(), StripError> {
+  let aliases = "<?php\nnamespace App\\Types;\n\ntype Ids = NonEmptyList<PositiveInt>;\n";
+  let source = r#"<?php
+namespace App;
+
+use App\Values\ArrayKey;
+use type App\Types\Ids;
+
+function find<T: object>(ClassString<T> $class, Ids $ids, ArrayKey $key): ?T {
+    return null;
+}
+"#;
+
+  let desugared = desugar_project(&[aliases, source])?;
+  assert_eq!(
+    text(&desugared.code),
+    r#"<?php
+namespace App;
+
+use App\Values\ArrayKey;
+
+
+/**
+ * @template T of object
+ * @param class-string<T> $class
+ * @param (non-empty-list<positive-int>) $ids
+ * @return ?T
+ */
+function find(string $class, mixed $ids, ArrayKey $key): ?object {
     return null;
 }
 "#
@@ -224,7 +262,7 @@ namespace App;
 
 type Result<T, E = string> = Ok<T>|Err<E>;
 type Pair<T> = array{T, T};
-type Id = positive-int;
+type Id = PositiveInt;
 "#;
 
   let source = r#"<?php
@@ -297,4 +335,41 @@ fn reports_a_type_alias_default_that_uses_a_later_parameter() {
     desugared,
     Err(StripError { line: 3, reason: "a type alias parameter has no argument" })
   );
+}
+
+#[test]
+fn maps_spans_of_the_plain_copy_back_to_the_typed_source() -> Result<(), StripError> {
+  let source =
+    "<?php\nfunction first<T>(list<T> $values): ?T {\n    return $values[0] ?? null;\n}\n";
+  let desugared = desugar_project(&[source])?;
+  let code = text(&desugared.code);
+  assert_eq!(
+    code,
+    "<?php\n/**\n * @template T\n * @param list<T> $values\n * @return ?T\n */\nfunction first(array $values): mixed {\n    return $values[0] ?? null;\n}\n"
+  );
+
+  let at = |needle: &str| code.find(needle).ok_or(StripError { line: 0, reason: "missing" });
+  let span = |start: usize, end: usize| typedhp::ByteSpan { start, end };
+  let source_text = |mapped: Option<typedhp::ByteSpan>| {
+    return mapped.map(|found| text(&source.as_bytes()[found.start..found.end]));
+  };
+
+  let lookup = at("$values[0]")?;
+  let erased = at("array")?;
+  let parameters = at("(array")?;
+  let tag = at("@template")?;
+  assert_eq!(
+    source_text(typedhp::source_span(&desugared, span(lookup, lookup + 10))),
+    Some("$values[0]".to_string())
+  );
+
+  assert_eq!(
+    typedhp::source_span(&desugared, span(erased, erased)).map(|found| found.start),
+    source.find("list<T>")
+  );
+
+  assert_eq!(typedhp::source_span(&desugared, span(erased, erased + 5)), None);
+  assert_eq!(typedhp::source_span(&desugared, span(parameters, parameters)), None);
+  assert_eq!(typedhp::source_span(&desugared, span(tag, tag + 9)), None);
+  return Ok(());
 }

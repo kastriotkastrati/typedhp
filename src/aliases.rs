@@ -15,6 +15,7 @@ use crate::sites::find_sites;
 use crate::strip::StripError;
 use crate::strip::guard_size;
 use crate::types::Reference;
+use crate::types::builtin_spelling;
 use crate::types::type_references;
 use crate::units::ByteSpan;
 use crate::units::line_at;
@@ -208,9 +209,12 @@ pub fn type_aliases(source: &[u8]) -> Result<Vec<TypeAlias>, StripError> {
         return Segment::Param(index);
       }
 
-      return match alias_name(&sites, reference.start, written) {
-        Some(alias) => Segment::Alias { name: alias, arguments: Vec::new() },
-        None => Segment::Text(resolve_class(&sites.names, reference.start, written)),
+      let alias = alias_name(&sites, reference.start, written);
+      let builtin = builtin_spelling(&sites.declarations, written);
+      return match (alias, builtin) {
+        (Some(alias), _) => Segment::Alias { name: alias, arguments: Vec::new() },
+        (None, Some(spelling)) => Segment::Text(spelling.as_bytes().to_vec()),
+        (None, None) => Segment::Text(resolve_class(&sites.names, reference.start, written)),
       };
     };
 

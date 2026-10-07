@@ -19,7 +19,7 @@ final class Result
         }
     }
 
-    public static function okOrThrow<T>(Result<T, non-empty-string> $result): T {
+    public static function okOrThrow<T>(Result<T, NonEmptyString> $result): T {
         if (!$result->ok) {
             throw new RuntimeException($result->error);
         }

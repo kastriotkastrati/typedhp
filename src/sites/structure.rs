@@ -103,4 +103,5 @@ pub struct Sites {
   pub constructions: Vec<Construction>,
   pub alias_declarations: Vec<AliasDeclaration>,
   pub names: Names,
+  pub groups: Vec<AngleGroup>,
 }

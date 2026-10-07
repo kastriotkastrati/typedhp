@@ -43,7 +43,7 @@ fn prints_a_file_with_its_types_stripped() -> std::io::Result<()> {
 fn strips_php_read_from_stdin() -> std::io::Result<()> {
   let output = run_with_stdin(
     &["strip", "--stdin", "app/Ids.php"],
-    b"<?php\ntype Id = positive-int;\nfunction id(Id $id): Id { return $id; }\n",
+    b"<?php\ntype Id = PositiveInt;\nfunction id(Id $id): Id { return $id; }\n",
   )?;
 
   assert_eq!(output.status.code(), Some(0));
@@ -91,8 +91,9 @@ fn prints_usage_for_unknown_arguments() -> std::io::Result<()> {
     "usage:
   typedhp strip <file>          print <file> with its types stripped
   typedhp strip --stdin <name>  strip PHP read from stdin; <name> labels errors
-  typedhp install <folder>      install typedhp, the php shim and the loader into <folder>
+  typedhp install <folder>      install typedhp, the php and mago shims and the loader into <folder>
   typedhp check [<mago args>]   type-check the project in this folder with Mago, through .typedhp/check/
+  typedhp mago <mago args>      run Mago; format, lint, analyze and guard work on typed files through .typedhp/
 "
   );
 

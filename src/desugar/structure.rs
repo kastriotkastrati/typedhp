@@ -7,6 +7,13 @@ pub struct Desugared {
   pub code: Vec<u8>,
   pub lines: Vec<usize>,
   pub docblocks: Vec<ByteSpan>,
+  pub(crate) kept: Vec<KeptSpan>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KeptSpan {
+  pub source: ByteSpan,
+  pub output_start: usize,
 }
 
 pub struct Annotation {

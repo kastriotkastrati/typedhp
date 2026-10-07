@@ -15,5 +15,9 @@ description = "run every test; the runtime tests need the php above on PATH"
 run = "cargo test"
 
 [tasks.php-check]
-description = "type-check runtime/ with typedhp, then lint the plain copy typedhp wrote; mago cannot parse runtime/ itself"
-run = ["cargo run --quiet -- check", "cd .typedhp/check && mago lint"]
+description = "type-check and lint runtime/, which is written in typedhp, through `typedhp mago`"
+run = ["cargo run --quiet -- mago analyze", "cargo run --quiet -- mago lint"]
+
+[tasks.php-format]
+description = "format runtime/ with mago through `typedhp mago`"
+run = "cargo run --quiet -- mago format"

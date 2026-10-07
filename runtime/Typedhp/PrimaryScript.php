@@ -6,7 +6,7 @@ use type Typedhp\Result;
 
 final class PrimaryScript
 {
-    public static function typedPath(): Result<?string, non-empty-string> {
+    public static function typedPath(): Result<?string, NonEmptyString> {
         $isCommandLine = PHP_SAPI === 'cli';
         if (!$isCommandLine) {
             return new Ok(null);

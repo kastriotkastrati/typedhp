@@ -13,7 +13,7 @@ final class Stripper
         return str_contains($path, DIRECTORY_SEPARATOR . 'vendor' . DIRECTORY_SEPARATOR);
     }
 
-    public static function source(string $path, string $original): Result<string, non-empty-string> {
+    public static function source(string $path, string $original): Result<string, NonEmptyString> {
         $home = dirname(__DIR__);
         $binary = "{$home}/bin/typedhp";
         $binaryModifiedAt = filemtime($binary);
@@ -63,7 +63,7 @@ final class Stripper
         return $stripped;
     }
 
-    private static function parseErrorSource(string $errors): Result<string, non-empty-string> {
+    private static function parseErrorSource(string $errors): Result<string, NonEmptyString> {
         $match = [];
         $isLocated = preg_match('/:(\d+): (.+)\z/s', rtrim($errors), $match) === 1;
         $line = $isLocated ? (int) $match[1] : 0;

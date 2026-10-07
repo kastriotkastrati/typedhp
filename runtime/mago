@@ -1,0 +1,7 @@
+#!/bin/sh
+# typedhp shim. Installed as `mago` by `typedhp install`; runs `typedhp mago`.
+#   In a project with typed files, `mago format`, `lint`, `analyze` and `guard` run on a plain copy
+#   in .typedhp/, and typedhp maps the results back to your files.
+#   Anything else runs the project's Mago unchanged: TYPEDHP_MAGO, vendor/bin/mago, or the next mago on PATH.
+set -eu
+exec "$(dirname "$(realpath "$0")")/typedhp" mago "$@"

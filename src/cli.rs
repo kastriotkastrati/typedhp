@@ -3,6 +3,7 @@ mod structure;
 pub use structure::Failure;
 
 use crate::check::check_command;
+use crate::mago::mago_command;
 use std::ffi::OsString;
 use std::io::Read;
 use std::io::Write;
@@ -17,8 +18,9 @@ fn usage() -> &'static str {
   return "usage:
   typedhp strip <file>          print <file> with its types stripped
   typedhp strip --stdin <name>  strip PHP read from stdin; <name> labels errors
-  typedhp install <folder>      install typedhp, the php shim and the loader into <folder>
+  typedhp install <folder>      install typedhp, the php and mago shims and the loader into <folder>
   typedhp check [<mago args>]   type-check the project in this folder with Mago, through .typedhp/check/
+  typedhp mago <mago args>      run Mago; format, lint, analyze and guard work on typed files through .typedhp/
 ";
 }
 
@@ -30,8 +32,12 @@ fn failure_exit_code() -> u8 {
   return 2;
 }
 
-fn shim() -> &'static str {
+fn php_shim() -> &'static str {
   return include_str!("../runtime/php");
+}
+
+fn mago_shim() -> &'static str {
+  return include_str!("../runtime/mago");
 }
 
 fn loader_files() -> [(&'static str, &'static str); 8] {
@@ -77,6 +83,9 @@ fn parse(arguments: &[OsString]) -> Result<Command, Failure> {
     [command, mago_arguments @ ..] if command == "check" => {
       Ok(Command::Check { mago_arguments: mago_arguments.to_vec() })
     }
+    [command, arguments @ ..] if command == "mago" => {
+      Ok(Command::Mago { arguments: arguments.to_vec() })
+    }
     _ => Err(Failure::Usage),
   };
 }
@@ -86,6 +95,7 @@ fn execute(command: &Command) -> Result<ExitCode, Failure> {
     Command::Strip { path, input } => strip_command(path, *input).map(|()| ExitCode::SUCCESS),
     Command::Install { folder } => install_command(folder).map(|()| ExitCode::SUCCESS),
     Command::Check { mago_arguments } => check_command(mago_arguments),
+    Command::Mago { arguments } => mago_command(arguments),
   };
 }
 
@@ -142,7 +152,8 @@ fn install_command(folder: &Path) -> Result<(), Failure> {
   std::fs::set_permissions(&cache, private).map_err(install_failure(&cache))?;
   let ini_text = format!("auto_prepend_file = \"{home_text}/loader.php\"\n");
   write_file(&bin.join("typedhp"), &binary, 0o755)?;
-  write_file(&bin.join("php"), shim().as_bytes(), 0o755)?;
+  write_file(&bin.join("php"), php_shim().as_bytes(), 0o755)?;
+  write_file(&bin.join("mago"), mago_shim().as_bytes(), 0o755)?;
   stripped_loader_files.iter().try_for_each(|(relative, code)| {
     return write_file(&home.join(relative), code, 0o644);
   })?;
@@ -151,13 +162,14 @@ fn install_command(folder: &Path) -> Result<(), Failure> {
   let summary = format!(
     "installed typedhp in {home_text}
   {home_text}/bin/php          adds --strip-types and --typecheck to php
+  {home_text}/bin/mago         runs your Mago, through a plain copy when files are typed
   {home_text}/bin/typedhp      strips and checks types
   {home_text}/loader.php       strips each file PHP includes, except files under vendor/
   {home_text}/Typedhp/         the classes loader.php uses
   {home_text}/ini/typedhp.ini  makes PHP run loader.php first, through auto_prepend_file
   {home_text}/cache/           stripped files, named by the hash of their source
 
-Put {home_text}/bin first on PATH, so that `php` finds the shim:
+Put {home_text}/bin first on PATH, so that `php` and `mago` find the shims:
   with mise:  add  _.path = [\"{home_text}/bin\"]  under [env] in ~/.config/mise/config.toml
   otherwise:  export PATH=\"{home_text}/bin:$PATH\"
 "
@@ -207,6 +219,18 @@ fn report(failure: &Failure) -> ExitCode {
     }
     Failure::Walk { error } => {
       (format!("cannot list the project files: {error}\n"), failure_exit_code())
+    }
+    Failure::MissingMago => {
+      let message = "cannot find mago\ninstall Mago with `composer require --dev carthage-software/mago`, put `mago` on PATH, or set TYPEDHP_MAGO to its path\n";
+      (message.to_string(), failure_exit_code())
+    }
+    Failure::Unsupported { command, flag } => {
+      let message = format!(
+        "typedhp: `mago {command} {}` does not work in a project with typed files yet\n",
+        flag.to_string_lossy()
+      );
+
+      (message, failure_exit_code())
     }
     Failure::StartMago { program, error } => {
       let message = format!(

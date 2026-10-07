@@ -126,7 +126,7 @@ final class Box implements Repository, \IteratorAggregate {
 
 #[test]
 fn keeps_every_line_number_when_types_span_several_lines() {
-  let source = "<?php\nfunction load<\n    TKey,\n    TValue,\n>(array{\n    id: int,\n    name: non-empty-string,\n} $row): void {\n    throw new \\Exception('line 9');\n}\n";
+  let source = "<?php\nfunction load<\n    TKey,\n    TValue,\n>(array{\n    id: int,\n    name: NonEmptyString,\n} $row): void {\n    throw new \\Exception('line 9');\n}\n";
   let expected = "<?php\nfunction load\n\n\n(array\n\n\n $row): void {\n    throw new \\Exception('line 9');\n}\n";
   assert_eq!(stripped(source), Ok(expected.to_string()));
 }
@@ -158,15 +158,15 @@ $after = fn(T $value): T => $value;
 fn erases_pseudo_types_and_literal_types() {
   let source = r#"<?php
 function describe(
-    positive-int $count,
-    class-string<\Throwable> $class,
-    array-key $key,
+    PositiveInt $count,
+    ClassString<\Throwable> $class,
+    ArrayKey $key,
     'asc'|'desc' $direction,
     int<0, max> $offset,
-    non-empty-list<string>|null $tags,
+    NonEmptyList<string>|null $tags,
     \Closure(int): string $format,
     T&\Countable $items,
-): non-empty-string {
+): NonEmptyString {
     return '';
 }
 "#;
@@ -184,6 +184,42 @@ function describe(
 ): string {
     return '';
 }
+"#;
+
+  assert_eq!(stripped(source), Ok(expected.to_string()));
+}
+
+#[test]
+fn refuses_hyphenated_type_names() {
+  let reason = "write this type in TitleCase, such as `NonEmptyString` for `non-empty-string`";
+  let parameter = "<?php\nfunction step(\n    int $start,\n    positive-int $step,\n): void {}\n";
+  let alias = "<?php\n\ntype Id = non-empty-list<int>;\n";
+  let argument = "<?php\n$ids = Ids::<array-key>::make();\n";
+  assert_eq!(stripped(parameter), Err(StripError { line: 4, reason }));
+  assert_eq!(stripped(alias), Err(StripError { line: 3, reason }));
+  assert_eq!(stripped(argument), Err(StripError { line: 2, reason }));
+}
+
+#[test]
+fn keeps_a_class_the_file_imports_or_declares_under_a_type_name() {
+  let source = r#"<?php
+namespace App;
+
+use App\Values\PositiveInt;
+
+final class NonEmptyString {}
+
+function label(PositiveInt $count, NonEmptyString $name, NonEmptyList<int> $ids): void {}
+"#;
+
+  let expected = r#"<?php
+namespace App;
+
+use App\Values\PositiveInt;
+
+final class NonEmptyString {}
+
+function label(PositiveInt $count, NonEmptyString $name, array $ids): void {}
 "#;
 
   assert_eq!(stripped(source), Ok(expected.to_string()));
@@ -223,7 +259,7 @@ class Settings {
 
     public const list<string> NAMES = [];
     private ?array{debug: bool} $flags = null;
-    public static non-empty-string $label = 'x';
+    public static NonEmptyString $label = 'x';
 }
 "#;
 

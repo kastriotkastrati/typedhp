@@ -11,7 +11,6 @@ use crate::types::erase;
 use crate::types::render;
 use crate::units::to_position;
 use itertools::Itertools;
-use std::borrow::Cow;
 
 pub fn guard_size(source: &[u8]) -> Result<(), StripError> {
   let fits = to_position(source.len()).is_ok();
@@ -41,7 +40,7 @@ pub fn strip_edits(source: &[u8], sites: &Sites) -> Result<Vec<Edit>, StripError
   return Ok(removals.chain(erasures.into_iter().flatten()).collect());
 }
 
-pub fn apply_edits(source: &[u8], edits: &[Edit]) -> Result<Vec<u8>, StripError> {
+pub fn splice(source: &[u8], edits: &[Edit]) -> Result<Vec<u8>, StripError> {
   let ordered =
     edits.iter().sorted_by_key(|edit| (edit.span.start, edit.span.end)).collect::<Vec<_>>();
 
@@ -54,16 +53,22 @@ pub fn apply_edits(source: &[u8], edits: &[Edit]) -> Result<Vec<u8>, StripError>
 
   let kept_starts = std::iter::once(0).chain(ordered.iter().map(|edit| edit.span.end));
   let kept_ends = ordered.iter().map(|edit| edit.span.start).chain(std::iter::once(source.len()));
-  let kept = kept_starts.zip(kept_ends).map(|(start, end)| Cow::Borrowed(&source[start..end]));
-  let rewritten = ordered.iter().map(|edit| {
+  let kept = kept_starts.zip(kept_ends).map(|(start, end)| &source[start..end]);
+  let replaced = ordered.iter().map(|edit| edit.replacement.as_slice());
+  let pieces = kept.interleave(replaced).collect::<Vec<&[u8]>>();
+  return Ok(pieces.concat());
+}
+
+pub fn apply_edits(source: &[u8], edits: &[Edit]) -> Result<Vec<u8>, StripError> {
+  let line_keeping = edits.iter().map(|edit| {
     let removed = &source[edit.span.start..edit.span.end];
     let newlines = removed.iter().filter(|byte| **byte == b'\n').count();
     let kept_lines = vec![b'\n'; newlines];
-    return Cow::Owned([edit.replacement.as_slice(), &kept_lines].concat());
+    let replacement = [edit.replacement.as_slice(), &kept_lines].concat();
+    return Edit { span: edit.span, replacement };
   });
 
-  let pieces = kept.interleave(rewritten).collect::<Vec<Cow<'_, [u8]>>>();
-  return Ok(pieces.concat());
+  return splice(source, &line_keeping.collect::<Vec<_>>());
 }
 
 pub fn strip(source: &[u8]) -> Result<Vec<u8>, StripError> {

@@ -19,12 +19,14 @@ use crate::types::TypeParam;
 use crate::types::TypeParamUse;
 use crate::types::Variance;
 use crate::types::argument_references;
+use crate::types::builtin_spelling;
 use crate::types::erase;
 use crate::types::type_param_at;
 use crate::types::type_references;
 use crate::units::ByteSpan;
 use itertools::Itertools;
 use structure::Annotation;
+use structure::KeptSpan;
 use structure::TagContext;
 
 fn tag_text(
@@ -38,9 +40,11 @@ fn tag_text(
     let alias =
       if is_type_param { None } else { alias_name(context.sites, reference.start, written) };
 
-    return match alias {
-      Some(name) => Segment::Alias { name, arguments: Vec::new() },
-      None => Segment::Text(written.to_vec()),
+    let builtin = builtin_spelling(&context.sites.declarations, written).filter(|_| !is_type_param);
+    return match (alias, builtin) {
+      (Some(name), _) => Segment::Alias { name, arguments: Vec::new() },
+      (None, Some(spelling)) => Segment::Text(spelling.as_bytes().to_vec()),
+      (None, None) => Segment::Text(written.to_vec()),
     };
   };
 
@@ -202,8 +206,12 @@ fn docblock_edit(source: &[u8], doc_comments: &[ByteSpan], annotation: &Annotati
     });
 
     let Some(own_line) = own_line else {
+      let trailing_blanks =
+        source[doc.start..closing].iter().rev().take_while(|byte| matches!(byte, b' ' | b'\t'));
+
+      let content_end = closing - trailing_blanks.count();
       let replacement = [tag_lines.as_slice(), b"\n", indent, b" "].concat();
-      return Edit { span: ByteSpan { start: closing, end: closing }, replacement };
+      return Edit { span: ByteSpan { start: content_end, end: closing }, replacement };
     };
 
     let lines = annotation.tags.iter().map(|tag| [indent, b" * ", tag.as_slice(), b"\n"].concat());
@@ -247,6 +255,46 @@ fn output_span(source: &[u8], edits: &[Edit], inserted: &Edit) -> ByteSpan {
   return ByteSpan { start, end: start + inserted.replacement.len() };
 }
 
+fn kept_spans(source: &[u8], edits: &[Edit]) -> Vec<KeptSpan> {
+  let ordered =
+    edits.iter().sorted_by_key(|edit| (edit.span.start, edit.span.end)).collect::<Vec<_>>();
+
+  let kept_starts = std::iter::once(0).chain(ordered.iter().map(|edit| edit.span.end));
+  let kept_ends = ordered.iter().map(|edit| edit.span.start).chain(std::iter::once(source.len()));
+  let written_lengths = ordered.iter().map(|edit| {
+    let removed = &source[edit.span.start..edit.span.end];
+    let kept_newlines = removed.iter().filter(|byte| **byte == b'\n').count();
+    return edit.replacement.len() + kept_newlines;
+  });
+
+  let spans = kept_starts.zip(kept_ends).map(|(start, end)| ByteSpan { start, end });
+  let followed_by_writes = spans.zip(written_lengths.chain(std::iter::once(0)));
+  let kept = followed_by_writes.scan(0, |output_start, (span, written)| {
+    let kept = KeptSpan { source: span, output_start: *output_start };
+    *output_start += span.end - span.start + written;
+    return Some(kept);
+  });
+
+  return kept.collect();
+}
+
+pub fn source_span(desugared: &Desugared, span: ByteSpan) -> Option<ByteSpan> {
+  let holders = desugared.kept.iter().filter(|kept| {
+    let output_end = kept.output_start + kept.source.end - kept.source.start;
+    let starts_inside = kept.output_start <= span.start;
+    let ends_inside = span.end <= output_end;
+    return starts_inside && ends_inside;
+  });
+
+  let mapped = holders.map(|kept| {
+    let start = kept.source.start + span.start - kept.output_start;
+    let end = kept.source.start + span.end - kept.output_start;
+    return ByteSpan { start, end };
+  });
+
+  return mapped.dedup().exactly_one().ok();
+}
+
 pub fn desugar(source: &[u8], table: &AliasTable) -> Result<Desugared, StripError> {
   guard_size(source)?;
   let lexed = lex(source)?;
@@ -262,5 +310,6 @@ pub fn desugar(source: &[u8], table: &AliasTable) -> Result<Desugared, StripErro
   let code = apply_edits(source, &edits)?;
   let lines = line_map(source, &edits);
   let docblocks = docblock_edits.iter().map(|edit| output_span(source, &edits, edit)).collect();
-  return Ok(Desugared { code, lines, docblocks });
+  let kept = kept_spans(source, &edits);
+  return Ok(Desugared { code, lines, docblocks, kept });
 }

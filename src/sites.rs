@@ -1,7 +1,9 @@
 mod structure;
 
 pub use structure::AliasDeclaration;
+pub use structure::AngleGroup;
 pub use structure::ClassHeader;
+pub use structure::Clause;
 pub use structure::Code;
 pub use structure::Construction;
 pub use structure::FunctionHeader;
@@ -24,8 +26,6 @@ use crate::types::parse_span;
 use crate::types::type_params;
 use crate::units::ByteSpan;
 use itertools::Itertools;
-use structure::AngleGroup;
-use structure::Clause;
 
 fn first_token_from(tokens: &[Token], offset: usize) -> usize {
   return tokens.partition_point(|token| token.span.start < offset);
@@ -38,6 +38,15 @@ fn kind_at(tokens: &[Token], index: usize) -> Option<Kind> {
 fn previous_kind(tokens: &[Token], index: usize) -> Option<Kind> {
   let previous = index.checked_sub(1)?;
   return kind_at(tokens, previous);
+}
+
+fn declares_class_like(tokens: &[Token], index: usize) -> bool {
+  let is_class_like =
+    matches!(tokens[index].kind, Kind::Class | Kind::Interface | Kind::Trait | Kind::Enum);
+
+  let follows_double_colon = previous_kind(tokens, index) == Some(Kind::DoubleColon);
+  let names_declaration = kind_at(tokens, index + 1) == Some(Kind::Name);
+  return is_class_like && !follows_double_colon && names_declaration;
 }
 
 fn matching_close(tokens: &[Token], open_index: usize) -> Option<usize> {
@@ -503,12 +512,7 @@ fn class_scope(code: &Code<'_>, group: &AngleGroup) -> Result<Option<Scope>, Str
 fn class_headers(code: &Code<'_>, groups: &[AngleGroup]) -> Result<Vec<ClassHeader>, StripError> {
   let headers = (0..code.tokens.len()).filter_map(|index| {
     let token = code.tokens[index];
-    let is_class_like =
-      matches!(token.kind, Kind::Class | Kind::Interface | Kind::Trait | Kind::Enum);
-
-    let follows_double_colon = previous_kind(code.tokens, index) == Some(Kind::DoubleColon);
-    let names_declaration = kind_at(code.tokens, index + 1) == Some(Kind::Name);
-    let is_declaration = is_class_like && !follows_double_colon && names_declaration;
+    let is_declaration = declares_class_like(code.tokens, index);
     if !is_declaration {
       return None;
     }
@@ -795,12 +799,22 @@ pub fn find_sites(source: &[u8], tokens: &[Token]) -> Result<Sites, StripError> 
   let aliases =
     declared_aliases.chain(imported_aliases.map(|import| import.local.clone())).collect();
 
+  let class_imports =
+    names.statements.iter().filter(|statement| statement.kind == ImportKind::Class);
+  let imported_classes = class_imports.flat_map(|statement| statement.imports.iter());
+  let declared_classes = (0..tokens.len())
+    .filter(|index| declares_class_like(tokens, *index))
+    .map(|index| token_text(&code, &tokens[index + 1]).to_vec());
+
+  let class_names =
+    declared_classes.chain(imported_classes.map(|import| import.local.clone())).collect();
+
   let alias_removals = alias_declarations.iter().map(|declaration| declaration.removal);
   let import_removals = type_imports.map(|statement| statement.span);
   let removals = angle_spans.into_iter().chain(alias_removals).chain(import_removals).collect();
   return Ok(Sites {
     removals,
-    declarations: Declarations { scopes, aliases },
+    declarations: Declarations { scopes, aliases, classes: class_names },
     functions,
     classes,
     trait_uses: trait_uses(&code, &groups),
@@ -808,6 +822,7 @@ pub fn find_sites(source: &[u8], tokens: &[Token]) -> Result<Sites, StripError> 
     constructions: constructions(&code, &groups),
     alias_declarations,
     names,
+    groups,
   });
 }
 

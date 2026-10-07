@@ -56,6 +56,7 @@ pub struct Scope {
 pub struct Declarations {
   pub scopes: Vec<Scope>,
   pub aliases: Vec<Vec<u8>>,
+  pub classes: Vec<Vec<u8>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

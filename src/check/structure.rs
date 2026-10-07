@@ -12,6 +12,29 @@ pub struct Issue {
   pub code: Option<String>,
   pub message: String,
   pub annotations: Vec<Annotation>,
+  #[serde(default)]
+  pub edits: Vec<(FileName, Vec<Change>)>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct Change {
+  pub range: ChangeRange,
+  pub new_text: Vec<u8>,
+  pub safety: Safety,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ChangeRange {
+  pub start: usize,
+  pub end: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Safety {
+  Safe,
+  PotentiallyUnsafe,
+  Unsafe,
 }
 
 #[derive(Debug, Deserialize)]
@@ -55,4 +78,18 @@ pub struct Problem {
   pub path: PathBuf,
   pub line: usize,
   pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Project {
+  pub root: PathBuf,
+  pub entries: Vec<Entry>,
+  pub sources: Vec<(PathBuf, Vec<u8>)>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CheckKind {
+  Analyze,
+  Lint,
+  Guard,
 }

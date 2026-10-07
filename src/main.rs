@@ -2,6 +2,8 @@
 
 mod check;
 mod cli;
+mod format;
+mod mago;
 
 fn main() -> std::process::ExitCode {
   return cli::run();
