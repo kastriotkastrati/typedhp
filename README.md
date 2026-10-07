@@ -7,7 +7,7 @@ TypeScript-style types for PHP. Your files stay `.php`, run on the PHP you alrea
 
 final class Stack<T>
 {
-    private list<T> $items = [];
+    private List<T> $items = [];
 
     public function push(T $item): static {
         $this->items[] = $item;
@@ -98,7 +98,7 @@ php main.php                         # plain php, as before
 Functions, closures, classes, interfaces and traits can take type parameters. A parameter can have a bound (`T: \Countable`), a variance (`+T`, `-T`) and a default (`T = int`).
 
 ```php
-function first<T>(list<T> $items): ?T {
+function first<T>(List<T> $items): ?T {
     return $items[0] ?? null;
 }
 
@@ -134,7 +134,7 @@ $identity = fn<T>(T $value): T => $value;
 
 The types you already write in PHPDoc work in the code itself. PHP checks the plain part at runtime; Mago checks all of it.
 
-PHPDoc names with hyphens are written in TitleCase: `PositiveInt` for `positive-int`, `NonEmptyList<T>` for `non-empty-list<T>`. typedhp refuses the hyphenated names. It writes them back with hyphens in the docblocks it makes for Mago, and Mago's messages show them in TitleCase again.
+PHPDoc names with hyphens are written in TitleCase: `PositiveInt` for `positive-int`, `NonEmptyList<T>` for `non-empty-list<T>`. Lists are `List<T>` and `List{int, string}`, not `list<T>`. typedhp refuses the old spellings. It writes the hyphens back in the docblocks it makes for Mago, and Mago's messages show the TitleCase names again.
 
 A name such as `PositiveInt` still means your own class when the file imports it with `use` or declares it. A class with one of these names that lives in another file of the same namespace needs a `use` line or its full name, such as `\App\PositiveInt`.
 
@@ -184,7 +184,7 @@ namespace App;
 
 use type App\{User, UserId};
 
-function find_user(list<User> $users, UserId $id): ?User {
+function find_user(List<User> $users, UserId $id): ?User {
     foreach ($users as $user) {
         if ($user['id'] === $id) {
             return $user;
@@ -289,7 +289,7 @@ final class Stack
 
 With `--fix`, Mago only reports on the copy. Its report says what each fix changes, and typedhp makes the same change at the same spot in your file. It skips, and reports, a fix that would change text typedhp rewrote for Mago: a type it turned into plain PHP, a type parameter it removed, or a docblock it added. `--unsafe`, `--potentially-unsafe` and `--fail-on-remaining` work as they do in Mago.
 
-`mago format` writes a copy to `.typedhp/format/` in which each type Mago can't read becomes a plain name of the same width, such as `_q3____` for `list<T>`. Mago formats the copy as it would any PHP, and typedhp puts your types back in the formatted result. Because a stand-in is as wide as the type it replaces, Mago breaks lines where it would break them with the real types. Type aliases and `use type` imports become stand-in statements too, so Mago sorts the imports and keeps your blank lines.
+`mago format` writes a copy to `.typedhp/format/` in which each type Mago can't read becomes a plain name of the same width, such as `_q3____` for `List<T>`. Mago formats the copy as it would any PHP, and typedhp puts your types back in the formatted result. Because a stand-in is as wide as the type it replaces, Mago breaks lines where it would break them with the real types. Type aliases and `use type` imports become stand-in statements too, so Mago sorts the imports and keeps your blank lines.
 
 ## Coding agents
 
@@ -302,7 +302,7 @@ With `--fix`, Mago only reports on the copy. Its report says what each fix chang
 - **`mago format` leaves the text inside a type as you wrote it.** It moves a type that spans several lines as a block.
 - **Write types inline, not in docblocks.** typedhp writes the docblocks Mago needs. A docblock you write by hand reaches Mago as it is, so a type alias inside it is an unknown class.
 - **Import an alias with `use type` in every file except the one that declares it,** even within the same namespace. Without the import, `UserId` is a class name.
-- **PHP checks only the plain part of a type at runtime.** `list<int>` runs as `array`, `T` as its bound or `mixed`, and an alias as `mixed`. The full check happens in `php --typecheck`.
+- **PHP checks only the plain part of a type at runtime.** `List<int>` runs as `array`, `T` as its bound or `mixed`, and an alias as `mixed`. The full check happens in `php --typecheck`.
 - **`$box = new Box::<string>(...)` acts like a cast.** The checker takes `Box<string>` as the type of `$box`, but does not check the constructor arguments against it. Use it to create empty objects, such as `new Box::<string>()`. Type arguments on any other call are dropped; the checker infers them from the arguments.
 - **Default type parameters** (`T = int`) are allowed, but the checker ignores the default.
 - **Run `--typecheck` from your project root.**

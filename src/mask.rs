@@ -27,7 +27,8 @@ fn is_plain_type(text: &[u8]) -> bool {
   let mut words = parts.filter(|part| !part.is_empty());
   return words.all(|word| {
     let starts_like_name = word.first().is_some_and(|byte| !byte.is_ascii_digit());
-    return starts_like_name && word.iter().all(is_name_byte);
+    let is_reserved = word.eq_ignore_ascii_case(b"list");
+    return starts_like_name && !is_reserved && word.iter().all(is_name_byte);
   });
 }
 

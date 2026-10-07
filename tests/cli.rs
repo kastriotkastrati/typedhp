@@ -25,7 +25,7 @@ fn prints_a_file_with_its_types_stripped() -> std::io::Result<()> {
   let path = folder.path().join("first.php");
   std::fs::write(
     &path,
-    "<?php\nfunction first<T>(list<T> $items): ?T { return $items[0] ?? null; }\n",
+    "<?php\nfunction first<T>(List<T> $items): ?T { return $items[0] ?? null; }\n",
   )?;
 
   let output = typedhp().arg("strip").arg(&path).output()?;

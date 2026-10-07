@@ -29,7 +29,7 @@ function first<T: object>(T ...$values): ?T {
     return $values[0] ?? null;
 }
 
-function total(list<int> $numbers, int $limit): int {
+function total(List<int> $numbers, int $limit): int {
     return count($numbers);
 }
 "#;
@@ -49,7 +49,7 @@ function first(object ...$values): ?object {
     return $values[0] ?? null;
 }
 
-/** @param list<int> $numbers */ function total(array $numbers, int $limit): int {
+/** @param List<int> $numbers */ function total(array $numbers, int $limit): int {
     return count($numbers);
 }
 "#
@@ -63,7 +63,7 @@ function first(object ...$values): ?object {
     docblocks.collect::<Vec<_>>(),
     vec![
       " * @template T of object\n * @param T ...$values\n * @return ?T\n".to_string(),
-      "/** @param list<int> $numbers */ ".to_string(),
+      "/** @param List<int> $numbers */ ".to_string(),
     ]
   );
 
@@ -81,7 +81,7 @@ final class Box<+T> extends Base<T> implements Holder<T>, Countable
 {
     use Labels<T>;
 
-    public const list<int> SIZES = [1];
+    public const List<int> SIZES = [1];
     private ?T $value = null;
 
     public function __construct(private NonEmptyString $name) {}
@@ -110,7 +110,7 @@ final class Box extends Base implements Holder, Countable
 {
     /** @use Labels<T> */ use Labels;
 
-    /** @var list<int> */ public const array SIZES = [1];
+    /** @var List<int> */ public const array SIZES = [1];
     /** @var ?T */ private mixed $value = null;
 
     /** @param non-empty-string $name */ public function __construct(private string $name) {}
@@ -149,7 +149,7 @@ namespace App\Types;
 use App\Models\User;
 
 type Id = PositiveInt;
-type Users = list<User>;
+type Users = List<User>;
 type Index = array<Id, Users>;
 "#;
 
@@ -174,7 +174,7 @@ namespace App;
 
 
 /**
- * @param (array<(positive-int), (list<\App\Models\User>)>) $index
+ * @param (array<(positive-int), (List<\App\Models\User>)>) $index
  * @param (positive-int) $key
  * @return ?(positive-int)
  */
@@ -239,7 +239,7 @@ fn keeps_a_type_parameter_that_shares_an_alias_name() -> Result<(), StripError> 
 
 #[test]
 fn reports_a_type_alias_that_refers_to_itself() {
-  let source = "<?php\ntype Tree = list<Tree>;\nfunction walk(Tree $tree): void {}\n";
+  let source = "<?php\ntype Tree = List<Tree>;\nfunction walk(Tree $tree): void {}\n";
   let desugared = desugar_project(&[source]);
   assert_eq!(desugared, Err(StripError { line: 3, reason: "a type alias refers to itself" }));
 }
@@ -271,7 +271,7 @@ namespace App;
 
 use type App\{Result, Pair, Id};
 
-function load(Pair<Id> $ids): Result<list<Id>> {
+function load(Pair<Id> $ids): Result<List<Id>> {
     return new Err('none');
 }
 
@@ -291,7 +291,7 @@ namespace App;
 
 /**
  * @param (array{(positive-int), (positive-int)}) $ids
- * @return (\App\Ok<(list<(positive-int)>)>|\App\Err<string>)
+ * @return (\App\Ok<(List<(positive-int)>)>|\App\Err<string>)
  */
 function load(mixed $ids): mixed {
     return new Err('none');
@@ -340,12 +340,12 @@ fn reports_a_type_alias_default_that_uses_a_later_parameter() {
 #[test]
 fn maps_spans_of_the_plain_copy_back_to_the_typed_source() -> Result<(), StripError> {
   let source =
-    "<?php\nfunction first<T>(list<T> $values): ?T {\n    return $values[0] ?? null;\n}\n";
+    "<?php\nfunction first<T>(List<T> $values): ?T {\n    return $values[0] ?? null;\n}\n";
   let desugared = desugar_project(&[source])?;
   let code = text(&desugared.code);
   assert_eq!(
     code,
-    "<?php\n/**\n * @template T\n * @param list<T> $values\n * @return ?T\n */\nfunction first(array $values): mixed {\n    return $values[0] ?? null;\n}\n"
+    "<?php\n/**\n * @template T\n * @param List<T> $values\n * @return ?T\n */\nfunction first(array $values): mixed {\n    return $values[0] ?? null;\n}\n"
   );
 
   let at = |needle: &str| code.find(needle).ok_or(StripError { line: 0, reason: "missing" });
@@ -365,7 +365,7 @@ fn maps_spans_of_the_plain_copy_back_to_the_typed_source() -> Result<(), StripEr
 
   assert_eq!(
     typedhp::source_span(&desugared, span(erased, erased)).map(|found| found.start),
-    source.find("list<T>")
+    source.find("List<T>")
   );
 
   assert_eq!(typedhp::source_span(&desugared, span(erased, erased + 5)), None);

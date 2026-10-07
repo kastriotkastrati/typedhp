@@ -13,7 +13,7 @@ use type App\Types\{Id,   Name};
 type   Pair<T> =   array{T, T} ;
 final class Box<T> extends Base<T>
 {
-    public function __construct(private list<T> $items) {}
+    public function __construct(private List<T> $items) {}
 
     public function map<U>(\Closure(T): U $mapper): Box<U> {
         $pick = fn<V>(V $value): V => $value;
@@ -92,7 +92,7 @@ type Pair<T> = array{T, T};
 final class Box<T> extends Base<T>
 {
   public function __construct(
-    private list<T> $items,
+    private List<T> $items,
   ) {}
 
   public function map<U>(\Closure(T): U $mapper): Box<U>
@@ -149,8 +149,15 @@ fn reindents_a_type_that_spans_lines() -> Result<(), StripError> {
 }
 
 #[test]
+fn hides_a_bare_list_type_that_php_reserves() -> Result<(), StripError> {
+  let masked = typedhp::mask(b"<?php\nfunction ids(List $ids): List { return $ids; }\n")?;
+  assert_eq!(text(&masked.code), "<?php\nfunction ids(_q0_ $ids): _q1_ { return $ids; }\n");
+  return Ok(());
+}
+
+#[test]
 fn picks_placeholder_names_the_source_does_not_use() -> Result<(), StripError> {
-  let source = "<?php\n$_q1 = 1;\nfunction pick(list<int> $values): int { return $_q1; }\n";
+  let source = "<?php\n$_q1 = 1;\nfunction pick(List<int> $values): int { return $_q1; }\n";
   let masked = typedhp::mask(source.as_bytes())?;
   assert_eq!(
     text(&masked.code),
@@ -162,7 +169,7 @@ fn picks_placeholder_names_the_source_does_not_use() -> Result<(), StripError> {
 
 #[test]
 fn reports_a_placeholder_the_formatter_lost() -> Result<(), StripError> {
-  let masked = typedhp::mask(b"<?php\nfunction pick(list<int> $values): void {}\n")?;
+  let masked = typedhp::mask(b"<?php\nfunction pick(List<int> $values): void {}\n")?;
   let restored = typedhp::unmask(b"<?php\nfunction pick($values): void {}\n", &masked);
   assert_eq!(
     restored,

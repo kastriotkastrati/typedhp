@@ -42,10 +42,10 @@ use Alpha\Other;
 type   UserId =   PositiveInt;
 type Result<T, E = string> = Ok<T>|Err<E>;
 final   class Stack<T> implements Holder<T> {
-    public const list<int> SIZES = [1,2];
-  private ?list<T>   $items = null;
+    public const List<int> SIZES = [1,2];
+  private ?List<T>   $items = null;
   public function map<U>(\Closure(T): U $mapper)  : Stack<U> { return new Stack::<U>(); }
-    public function first(): ?T { $pick = fn<V>(list<V> $values): ?V => $values[0] ?? null; return $pick([1]); }
+    public function first(): ?T { $pick = fn<V>(List<V> $values): ?V => $values[0] ?? null; return $pick([1]); }
 }
 "#;
 }
@@ -63,9 +63,9 @@ type UserId = PositiveInt;
 type Result<T, E = string> = Ok<T>|Err<E>;
 final class Stack<T> implements Holder<T>
 {
-    public const list<int> SIZES = [1, 2];
+    public const List<int> SIZES = [1, 2];
 
-    private ?list<T> $items = null;
+    private ?List<T> $items = null;
 
     public function map<U>(\Closure(T): U $mapper): Stack<U>
     {
@@ -74,7 +74,7 @@ final class Stack<T> implements Holder<T>
 
     public function first(): ?T
     {
-        $pick = fn<V>(list<V> $values): ?V => $values[0] ?? null;
+        $pick = fn<V>(List<V> $values): ?V => $values[0] ?? null;
         return $pick([1]);
     }
 }
@@ -124,7 +124,7 @@ declare(strict_types=1);
 
 namespace App;
 
-function same<T>(list<T> $left, list<T> $right): bool {
+function same<T>(List<T> $left, List<T> $right): bool {
     return $left == $right;
 }
 "#,
@@ -172,11 +172,11 @@ namespace App;
 
 final class Ids<T>
 {
-    /** @param list<T> $items the items */
-    public function __construct(private list<T> $items) {}
+    /** @param List<T> $items the items */
+    public function __construct(private List<T> $items) {}
 
     /** Lists the ids. */
-    public function ids(list<int> $ids = null): list<int>
+    public function ids(List<int> $ids = null): List<int>
     {
         $fallback = array(1, 2);
         return $ids ?? $fallback;
@@ -194,11 +194,11 @@ namespace App;
 
 final class Ids<T>
 {
-    /** @param list<T> $items the items */
-    public function __construct(private list<T> $items) {}
+    /** @param List<T> $items the items */
+    public function __construct(private List<T> $items) {}
 
     /** Lists the ids. */
-    public function ids(?list<int> $ids = null): list<int>
+    public function ids(?List<int> $ids = null): List<int>
     {
         $fallback = [1, 2];
         return $ids ?? $fallback;
@@ -245,14 +245,14 @@ namespace App;
 
 /** @template T */ final class Ids
 {
-    /** @param list<T> $items the items
-     * @param list<T> $items
+    /** @param List<T> $items the items
+     * @param List<T> $items
      */
     public function __construct(private array $items) {}
 
     /** Lists the ids.
-     * @param list<int> $ids
-     * @return list<int>
+     * @param List<int> $ids
+     * @return List<int>
      */
     public function ids(array $ids = null): array
     {
@@ -273,7 +273,7 @@ fn skips_a_fix_that_changes_code_typedhp_rewrote() -> std::io::Result<()> {
   write(
     folder.path(),
     "src/pick.php",
-    "<?php\n\ndeclare(strict_types=1);\n\nfunction pick(Int|list<string> $value): Int\n{\n    return 1;\n}\n",
+    "<?php\n\ndeclare(strict_types=1);\n\nfunction pick(Int|List<string> $value): Int\n{\n    return 1;\n}\n",
   )?;
 
   let output = mago(folder.path(), &["lint", "--fix"])?;
@@ -286,7 +286,7 @@ fn skips_a_fix_that_changes_code_typedhp_rewrote() -> std::io::Result<()> {
   assert_eq!(output.status.code(), Some(1));
   assert_eq!(
     fixed,
-    "<?php\n\ndeclare(strict_types=1);\n\nfunction pick(Int|list<string> $value): int\n{\n    return 1;\n}\n"
+    "<?php\n\ndeclare(strict_types=1);\n\nfunction pick(Int|List<string> $value): int\n{\n    return 1;\n}\n"
   );
 
   return Ok(());
@@ -306,7 +306,7 @@ namespace App;
 
 final class Name<T>
 {
-    public function __construct(private list<T> $items) {}
+    public function __construct(private List<T> $items) {}
 
     public function name(): string
     {
@@ -338,7 +338,7 @@ namespace App;
 
 final class Name<T>
 {
-    public function __construct(private list<T> $items) {}
+    public function __construct(private List<T> $items) {}
 
     public function name(): string
     {
@@ -361,7 +361,7 @@ namespace App;
 
 final class Name<T>
 {
-    public function __construct(private list<T> $_items) {}
+    public function __construct(private List<T> $_items) {}
 
     public function name(): string
     {
@@ -377,7 +377,7 @@ final class Name<T>
 #[test]
 fn refuses_to_preview_fixes_to_typed_files() -> std::io::Result<()> {
   let folder = project()?;
-  write(folder.path(), "src/ids.php", "<?php\n\nfunction ids(list<int> $ids): void {}\n")?;
+  write(folder.path(), "src/ids.php", "<?php\n\nfunction ids(List<int> $ids): void {}\n")?;
   let output = mago(folder.path(), &["lint", "--fix", "--dry-run"])?;
   assert_eq!(output.status.code(), Some(2));
   assert_eq!(
@@ -448,7 +448,7 @@ fn skips_the_installed_mago_shim_when_it_looks_for_mago() -> std::io::Result<()>
   write(
     folder.path(),
     "src/ids.php",
-    "<?php\n\ndeclare(strict_types=1);\n\nfunction ids(list<int> $ids): bool {\n    return $ids == [];\n}\n",
+    "<?php\n\ndeclare(strict_types=1);\n\nfunction ids(List<int> $ids): bool {\n    return $ids == [];\n}\n",
   )?;
 
   let inherited = std::env::var_os("PATH").ok_or(std::io::Error::other("PATH is not set"))?;

@@ -59,7 +59,7 @@ final readonly class Point implements \JsonSerializable
 #[test]
 fn erases_a_generic_function() {
   let source = r#"<?php
-function first<T>(list<T> $items): ?T {
+function first<T>(List<T> $items): ?T {
     return $items[0] ?? null;
 }
 "#;
@@ -78,7 +78,7 @@ fn erases_generic_classes_to_their_bounds() {
   let source = r#"<?php
 interface Repository<T> {
     public function find(int $id): ?T;
-    public function all(): list<T>;
+    public function all(): List<T>;
 }
 
 final class Box<T : \Countable> implements Repository<T>, \IteratorAggregate<int, T> {
@@ -88,7 +88,7 @@ final class Box<T : \Countable> implements Repository<T>, \IteratorAggregate<int
 
     public function find(int $id): ?T { return $this->items[$id] ?? null; }
 
-    public function all(): list<T> { return $this->items; }
+    public function all(): List<T> { return $this->items; }
 
     public function map<U>(callable(T): U $mapper): Box<U> {
         return new Box::<U>($mapper($this->first));
@@ -201,6 +201,24 @@ fn refuses_hyphenated_type_names() {
 }
 
 #[test]
+fn refuses_lowercase_lists() {
+  let reason = "write lists as `List<T>`, not `list<T>`";
+  let generic = "<?php
+function ids(?list<int> $ids): void {}
+";
+  let shape = "<?php
+
+function pair(): list{int, string} { return [1, 'a']; }
+";
+  let nested = "<?php
+function rows(array<string, list<int>> $rows): void {}
+";
+  assert_eq!(stripped(generic), Err(StripError { line: 2, reason }));
+  assert_eq!(stripped(shape), Err(StripError { line: 3, reason }));
+  assert_eq!(stripped(nested), Err(StripError { line: 2, reason }));
+}
+
+#[test]
 fn keeps_a_class_the_file_imports_or_declares_under_a_type_name() {
   let source = r#"<?php
 namespace App;
@@ -236,7 +254,7 @@ fn drops_mixed_parts_of_an_intersection() {
 fn removes_type_arguments_from_calls() {
   let source = r#"<?php
 $box = new Box::<int>(1);
-$map = Map::<string, list<int>>::empty();
+$map = Map::<string, List<int>>::empty();
 $value = identity::<string>('x');
 $result = $service->load::<User>($id);
 "#;
@@ -257,7 +275,7 @@ fn erases_property_constant_and_trait_types() {
 class Settings {
     use Collects<User>;
 
-    public const list<string> NAMES = [];
+    public const List<string> NAMES = [];
     private ?array{debug: bool} $flags = null;
     public static NonEmptyString $label = 'x';
 }
@@ -285,7 +303,7 @@ fn reports_the_line_of_a_broken_type_param_list() {
 
 #[test]
 fn reports_the_line_of_a_broken_parameter_type() {
-  let source = "<?php\nfunction broken(\n    int $a,\n    list<int $b,\n) {}\n";
+  let source = "<?php\nfunction broken(\n    int $a,\n    List<int $b,\n) {}\n";
   let expected = StripError { line: 4, reason: "cannot read this parameter type" };
   assert_eq!(stripped(source), Err(expected));
 }
@@ -360,7 +378,7 @@ $name = type::class;
 
 #[test]
 fn reports_the_line_of_a_broken_type_alias() {
-  let source = "<?php\n\ntype Broken = list<;\n";
+  let source = "<?php\n\ntype Broken = List<;\n";
   let expected = StripError { line: 3, reason: "cannot read this type alias" };
   assert_eq!(stripped(source), Err(expected));
 }
@@ -370,7 +388,7 @@ fn erases_generic_type_aliases() {
   let source = r#"<?php
 type Result<T, E = string> = Ok<T>|Err<E>;
 function load(): Result<int> { return new Ok(1); }
-function parse(?Result<list<int>, \Throwable> $last): void {}
+function parse(?Result<List<int>, \Throwable> $last): void {}
 "#;
 
   let expected = r#"<?php
@@ -384,7 +402,7 @@ function parse(mixed $last): void {}
 
 #[test]
 fn reports_a_bound_on_a_type_alias_parameter() {
-  let source = "<?php\n\ntype Named<T: \\Stringable> = list<T>;\n";
+  let source = "<?php\n\ntype Named<T: \\Stringable> = List<T>;\n";
   let reason = "a type alias parameter cannot have a bound or a variance";
   assert_eq!(stripped(source), Err(StripError { line: 3, reason }));
 }

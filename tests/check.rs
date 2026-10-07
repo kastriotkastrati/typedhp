@@ -67,7 +67,7 @@ namespace App;
 /**
  * Doubles each number.
  */
-function double(list<int> $numbers): list<int> {
+function double(List<int> $numbers): List<int> {
     return array_map(fn(int $number): int => $number * 2, $numbers);
 }
 
@@ -81,7 +81,7 @@ echo double(['a'])[0];
   assert_eq!(
     text(&output.stdout),
     "src/use.php:13: error[invalid-argument]: Invalid argument type for argument #1 of `intdiv`: expected `int`, but found `string`.
-src/use.php:14: error[possibly-invalid-argument]: Possible argument type mismatch for argument #1 of `App\\double`: expected `list<int>`, but possibly received `list{string('a')}`.
+src/use.php:14: error[possibly-invalid-argument]: Possible argument type mismatch for argument #1 of `App\\double`: expected `List<int>`, but possibly received `List{string('a')}`.
 "
   );
 

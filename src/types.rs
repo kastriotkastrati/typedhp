@@ -111,14 +111,22 @@ pub fn title_case_types(message: &str) -> String {
       return segment.to_string();
     }
 
-    let runs =
+    let chunks =
       segment.chars().chunk_by(|character| character.is_ascii_alphabetic() || *character == '-');
 
-    let rewritten = (&runs).into_iter().map(|(is_word, run)| {
-      let run = run.collect::<String>();
-      let is_builtin = is_word && builtin_spellings().contains(&run.as_str());
+    let runs = (&chunks).into_iter().map(|(is_word, run)| (is_word, run.collect::<String>()));
+    let runs = runs.collect::<Vec<_>>();
+    let next_characters = runs.iter().skip(1).map(|(_, run)| run.chars().next());
+    let followers = next_characters.chain(std::iter::once(None));
+    let rewritten = runs.iter().zip(followers).map(|((is_word, run), follower)| {
+      let is_builtin = *is_word && builtin_spellings().contains(&run.as_str());
+      let is_list = *is_word && run == "list" && matches!(follower, Some('<' | '{'));
+      if is_list {
+        return "List".to_string();
+      }
+
       if !is_builtin {
-        return run;
+        return run.clone();
       }
 
       let parts = run.split('-').filter_map(|part| part.split_at_checked(1));
@@ -133,7 +141,7 @@ pub fn title_case_types(message: &str) -> String {
   return segments.collect::<Vec<_>>().join("`");
 }
 
-fn reject_hyphenated(source: &[u8], node: &Type<'_>) -> Result<(), &'static str> {
+fn reject_old_spellings(source: &[u8], node: &Type<'_>) -> Result<(), &'static str> {
   let start = to_offset(node.span().start.offset)?;
   let rest = source.get(start..).ok_or("type outside the source")?;
   let word_length = rest
@@ -141,7 +149,8 @@ fn reject_hyphenated(source: &[u8], node: &Type<'_>) -> Result<(), &'static str>
     .take_while(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
     .count();
 
-  let is_hyphenated = rest[..word_length].windows(3).any(|window| {
+  let word = &rest[..word_length];
+  let is_hyphenated = word.windows(3).any(|window| {
     return window[0].is_ascii_alphabetic() && window[1] == b'-' && window[2].is_ascii_alphabetic();
   });
 
@@ -149,7 +158,12 @@ fn reject_hyphenated(source: &[u8], node: &Type<'_>) -> Result<(), &'static str>
     return Err("write this type in TitleCase, such as `NonEmptyString` for `non-empty-string`");
   }
 
-  return children(node).into_iter().try_for_each(|child| reject_hyphenated(source, child));
+  let is_lowercase_list = word == b"list";
+  if is_lowercase_list {
+    return Err("write lists as `List<T>`, not `list<T>`");
+  }
+
+  return children(node).into_iter().try_for_each(|child| reject_old_spellings(source, child));
 }
 
 fn skip_whitespace(source: &[u8], start: usize) -> usize {
@@ -173,7 +187,7 @@ pub fn parse_span(
     return Ok(None);
   };
 
-  reject_hyphenated(source, &parsed_type)?;
+  reject_old_spellings(source, &parsed_type)?;
   return byte_span(parsed_type.span()).map(Some);
 }
 
@@ -188,7 +202,7 @@ pub fn generic_arguments_span(
   let content = [b"X".as_slice(), arguments].concat();
   let arena = LocalArena::new();
   let parsed = parse_type(&arena, &content, source_span(anchor, limit)?).map_err(|_| invalid)?;
-  reject_hyphenated(source, &parsed)?;
+  reject_old_spellings(source, &parsed)?;
   let Type::Reference(reference) = &parsed else {
     return Err(invalid);
   };

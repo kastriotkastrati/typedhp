@@ -33,7 +33,7 @@ Write types inline, wherever PHP takes a type: parameters, return types, propert
 ```php
 final class Settings
 {
-    public const list<string> NAMES = ['debug', 'cache'];
+    public const List<string> NAMES = ['debug', 'cache'];
 
     public ?array{debug: bool} $flags = null;
 
@@ -52,11 +52,11 @@ Don't write `@param`, `@return`, `@var`, `@template`, `@extends`, `@implements` 
 
 Plain PHP types work as before. On top of them, use these. The right column is what PHP checks at runtime; Mago checks the whole type.
 
-Write the PHPDoc names that have hyphens in TitleCase: `PositiveInt`, not `positive-int`. typedhp refuses the hyphenated names. Mago's messages show the TitleCase names too.
+Write the PHPDoc names that have hyphens in TitleCase: `PositiveInt`, not `positive-int`. Write lists as `List<T>`, not `list<T>`. typedhp refuses the old spellings. Mago's messages show the new ones too.
 
 | Type | Means | PHP runs it as |
 |---|---|---|
-| `list<T>`, `NonEmptyList<T>` | array with keys 0, 1, 2, … | `array` |
+| `List<T>`, `NonEmptyList<T>` | array with keys 0, 1, 2, … | `array` |
 | `array<K, V>`, `NonEmptyArray<K, V>` | array with these keys and values | `array` |
 | `array{id: int, name?: string}` | array with these keys; `?` marks a key that may be missing | `array` |
 | `object{id: int}` | object with these properties | `object` |
@@ -77,7 +77,7 @@ Write the PHPDoc names that have hyphens in TitleCase: `PositiveInt`, not `posit
 | a type parameter `T` | | its bound, or `mixed` |
 | a type alias | | `mixed` |
 
-`?` and `|null` keep working: `?list<int>` runs as `?array`.
+`?` and `|null` keep working: `?List<int>` runs as `?array`.
 
 PHP checks only the right column. A `PositiveInt` parameter still accepts `0` when PHP runs it, and an alias accepts anything. Validate data from outside the program, such as request input, JSON and database rows, with real runtime checks.
 
@@ -99,7 +99,7 @@ Pass type arguments after a class name, wherever it appears: `extends Pair<int, 
 ```php
 final readonly class Collection<+T> implements \IteratorAggregate<int, T>, \Countable
 {
-    public function __construct(private list<T> $items = []) {}
+    public function __construct(private List<T> $items = []) {}
 
     public function map<U>(\Closure(T): U $mapper): Collection<U> {
         return new Collection(array_map($mapper, $this->items));
@@ -146,7 +146,7 @@ interface Handler<-T>
     public function handle(T $value): void;
 }
 
-function first<T>(list<T> $items): ?T {
+function first<T>(List<T> $items): ?T {
     return $items[0] ?? null;
 }
 

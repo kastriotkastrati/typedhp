@@ -184,7 +184,7 @@ fn strips_in_php_processes_started_by_the_script() -> std::io::Result<()> {
   write(
     &installation.project,
     "child.php",
-    "<?php\nfunction twice(list<int> $items): int { return count($items) * 2; }\necho twice([1, 2]), \"\\n\";\n",
+    "<?php\nfunction twice(List<int> $items): int { return count($items) * 2; }\necho twice([1, 2]), \"\\n\";\n",
   )?;
 
   write(
@@ -205,7 +205,7 @@ fn reads_of_a_typed_file_return_its_original_text() -> std::io::Result<()> {
   write(
     &installation.project,
     "child.php",
-    "<?php\nfunction twice(list<int> $items): int { return count($items) * 2; }\necho twice([1, 2]), \"\\n\";\n",
+    "<?php\nfunction twice(List<int> $items): int { return count($items) * 2; }\necho twice([1, 2]), \"\\n\";\n",
   )?;
 
   write(
@@ -214,7 +214,7 @@ fn reads_of_a_typed_file_return_its_original_text() -> std::io::Result<()> {
     r#"<?php
 require __DIR__ . '/child.php';
 $text = file_get_contents(__DIR__ . '/child.php');
-echo str_contains($text, 'list<int> $items') ? 'original' : 'stripped', "\n";
+echo str_contains($text, 'List<int> $items') ? 'original' : 'stripped', "\n";
 "#,
   )?;
 
@@ -229,7 +229,7 @@ fn strips_an_edited_file_again_and_caches_each_version() -> std::io::Result<()> 
   let installation = install()?;
   let script = |factor: u32| {
     return format!(
-      "<?php\nfunction scale(list<int> $items): int {{ return count($items) * {factor}; }}\necho scale([1, 2]), \"\\n\";\n"
+      "<?php\nfunction scale(List<int> $items): int {{ return count($items) * {factor}; }}\necho scale([1, 2]), \"\\n\";\n"
     );
   };
 
@@ -274,13 +274,13 @@ fn type_checks_the_project_through_the_shim() -> std::io::Result<()> {
   write(
     &installation.project,
     "src/total.php",
-    "<?php\n\nfunction total(list<int> $numbers): int {\n    return count($numbers);\n}\n\necho total(['a']);\n",
+    "<?php\n\nfunction total(List<int> $numbers): int {\n    return count($numbers);\n}\n\necho total(['a']);\n",
   )?;
 
   let output = php(&installation, &["--typecheck"])?;
   assert_eq!(
     text(&output.stdout),
-    "src/total.php:7: error[possibly-invalid-argument]: Possible argument type mismatch for argument #1 of `total`: expected `list<int>`, but possibly received `list{string('a')}`.\n"
+    "src/total.php:7: error[possibly-invalid-argument]: Possible argument type mismatch for argument #1 of `total`: expected `List<int>`, but possibly received `List{string('a')}`.\n"
   );
 
   assert_eq!(output.status.code(), Some(1));
